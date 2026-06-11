@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>케이프드 통합 관리</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, "Pretendard", "Segoe UI", sans-serif; background:#F6F2EC; color:#1E1A17; -webkit-text-size-adjust:100%; }
+input, select, button { font-family: inherit; }
+
+/* 로그인 */
+.login-wrap { min-height:100vh; display:grid; place-items:center; padding:20px; }
+.login-card { background:#fff; border-radius:20px; padding:36px 30px; width:100%; max-width:380px; box-shadow:0 14px 40px rgba(110,60,30,.12); }
+.login-logo { width:56px; height:56px; border-radius:15px; background:linear-gradient(135deg,#B5322E,#8E2420); color:#fff; display:grid; place-items:center; font-weight:800; font-size:28px; margin:0 auto 16px; box-shadow:0 6px 16px rgba(181,50,46,.3); }
+.login-card h1 { text-align:center; font-size:20px; margin-bottom:4px; letter-spacing:-.3px; }
+.login-card .sub { text-align:center; color:#9A8E7E; font-size:12px; margin-bottom:24px; letter-spacing:.5px; text-transform:uppercase; }
+.field { margin-bottom:14px; }
+.field label { display:block; font-size:13px; font-weight:600; margin-bottom:6px; }
+.field select, .field input { width:100%; border:1.5px solid #D8CDBD; border-radius:11px; padding:12px; font-size:15px; background:#fff; }
+.err { background:#FBE4E3; color:#B5322E; padding:10px; border-radius:9px; font-size:13px; margin-bottom:14px; text-align:center; }
+.setup-note { background:#FBF1DC; color:#9A6A1E; padding:14px; border-radius:11px; font-size:12.5px; line-height:1.6; margin-bottom:16px; }
+
+/* 레이아웃 */
+.topbar { display:flex; justify-content:space-between; align-items:center; padding:14px 20px; background:#fff; border-bottom:1px solid #E6DFD4; }
+.brand { display:flex; align-items:center; gap:11px; }
+.logo { width:40px; height:40px; border-radius:11px; background:linear-gradient(135deg,#B5322E,#8E2420); color:#fff; display:grid; place-items:center; font-weight:800; font-size:20px; }
+.brand-name { font-weight:800; font-size:16px; letter-spacing:-.3px; }
+.brand-name span { color:#B5322E; font-weight:600; }
+.who { display:flex; align-items:center; gap:10px; }
+.who-name { font-size:13px; font-weight:600; text-align:right; }
+.who-name small { display:block; color:#9A8E7E; font-weight:500; }
+.logout { border:1px solid #D8CDBD; background:#fff; border-radius:9px; padding:7px 12px; font-size:12px; cursor:pointer; color:#5E4A36; }
+.tabs { display:flex; gap:2px; padding:10px 20px 0; background:#fff; border-bottom:1px solid #E6DFD4; overflow-x:auto; }
+.tab { border:none; background:none; padding:10px 14px; font-size:14px; font-weight:600; color:#9A8E7E; cursor:pointer; border-bottom:2.5px solid transparent; white-space:nowrap; }
+.tab.on { color:#B5322E; border-bottom-color:#B5322E; }
+.content { padding:20px; max-width:1080px; margin:0 auto; }
+.grid-2 { display:grid; grid-template-columns:1.4fr 1fr; gap:18px; }
+@media(max-width:820px){ .grid-2{ grid-template-columns:1fr; } }
+
+.card { background:#fff; border:1px solid #E6DFD4; border-radius:16px; padding:20px; margin-bottom:18px; }
+.card-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; flex-wrap:wrap; gap:8px; }
+.card h2 { font-size:16px; font-weight:800; margin:0 0 14px; letter-spacing:-.3px; }
+.card-head h2 { margin:0; }
+.date-pill { background:#F3ECE0; color:#8E7A5E; font-size:12px; font-weight:600; padding:5px 10px; border-radius:20px; border:none; }
+.muted { color:#9A8E7E; font-size:12px; }
+.section-label { font-size:12px; font-weight:700; color:#B5322E; text-transform:uppercase; letter-spacing:.5px; margin:18px 0 8px; }
+
+.menu-row { display:grid; grid-template-columns:1fr auto auto auto; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid #F0E9DD; }
+.m-name { font-weight:600; }
+.m-price { color:#9A8E7E; font-size:13px; }
+.m-sub { font-weight:700; font-variant-numeric:tabular-nums; min-width:62px; text-align:right; color:#5E4A36; }
+.stepper { display:flex; align-items:center; gap:4px; }
+.stepper button { width:28px; height:28px; border:1px solid #D8CDBD; background:#fff; border-radius:7px; font-size:16px; cursor:pointer; color:#5E4A36; }
+.stepper input { width:48px; text-align:center; border:1px solid #D8CDBD; border-radius:7px; padding:6px; font-size:14px; font-variant-numeric:tabular-nums; }
+.mat-row { display:grid; grid-template-columns:1fr 100px auto; gap:8px; margin-bottom:8px; }
+.mat-row input { border:1px solid #D8CDBD; border-radius:8px; padding:9px 10px; font-size:13px; width:100%; }
+.mat-add { border:1px solid #D8CDBD; background:#F6F2EC; border-radius:8px; width:38px; cursor:pointer; font-size:17px; color:#5E4A36; }
+
+.sticky { align-self:start; }
+.pay-input { margin-bottom:12px; }
+.pay-input label { display:block; font-size:13px; font-weight:600; margin-bottom:5px; }
+.peso-field { display:flex; align-items:center; border:1.5px solid #D8CDBD; border-radius:10px; overflow:hidden; }
+.peso-field span { padding:0 12px; color:#9A8E7E; font-weight:700; background:#F6F2EC; align-self:stretch; display:flex; align-items:center; }
+.peso-field input { flex:1; border:none; padding:12px; font-size:16px; font-variant-numeric:tabular-nums; outline:none; width:100%; }
+.reconcile { background:#FAF6EF; border-radius:12px; padding:14px; margin:14px 0; }
+.rec-row { display:flex; justify-content:space-between; padding:5px 0; font-size:14px; }
+.rec-row.big { font-size:16px; padding:12px 0; border-top:1px solid #E6DFD4; margin-top:8px; }
+.rec-row b { font-variant-numeric:tabular-nums; }
+.rec-flag { margin-top:8px; padding:10px 12px; border-radius:9px; font-weight:700; font-size:14px; text-align:center; }
+.rec-flag.ok { background:#E3F3E8; color:#1F7A43; }
+.rec-flag.bad { background:#FBE4E3; color:#B5322E; }
+.rec-flag.idle { background:#F0E9DD; color:#9A8E7E; font-weight:500; }
+.btn-primary { width:100%; background:#B5322E; color:#fff; border:none; padding:14px; border-radius:11px; font-size:15px; font-weight:700; cursor:pointer; margin-top:6px; }
+.btn-primary:disabled { background:#D8CDBD; cursor:not-allowed; }
+.hint { font-size:12px; color:#9A8E7E; margin:10px 0 0; line-height:1.5; }
+.prev-row { display:flex; justify-content:space-between; padding:7px 0; font-size:13px; border-bottom:1px solid #F0E9DD; }
+
+.kpi-row { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:18px; }
+@media(max-width:820px){ .kpi-row{ grid-template-columns:1fr; } }
+.kpi { background:#fff; border:1px solid #E6DFD4; border-radius:14px; padding:18px; }
+.kpi.accent { background:linear-gradient(135deg,#B5322E,#8E2420); border:none; }
+.kpi-label { font-size:12px; color:#9A8E7E; margin-bottom:8px; }
+.kpi.accent .kpi-label { color:#F3C9C7; }
+.kpi-value { font-size:23px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:-.5px; }
+.kpi.accent .kpi-value { color:#fff; }
+.bar-row { display:grid; grid-template-columns:92px 1fr auto; align-items:center; gap:10px; margin-bottom:11px; }
+.bar-name { font-size:13px; font-weight:600; display:flex; align-items:center; gap:5px; }
+.bar-track { background:#F0E9DD; border-radius:6px; height:13px; overflow:hidden; }
+.bar-fill { background:linear-gradient(90deg,#C9453F,#B5322E); height:100%; }
+.bar-val { font-size:13px; font-weight:700; font-variant-numeric:tabular-nums; min-width:66px; text-align:right; }
+.badge { font-size:10px; font-weight:700; padding:1px 6px; border-radius:5px; }
+.badge.direct { background:#E8EEF6; color:#3A5A82; }
+.badge.franchise { background:#F6EEE2; color:#9A6A1E; }
+.data-table { width:100%; border-collapse:collapse; font-size:13px; }
+.data-table th { text-align:left; color:#9A8E7E; font-size:11px; text-transform:uppercase; letter-spacing:.4px; padding:8px 6px; border-bottom:2px solid #E6DFD4; }
+.data-table th small { display:block; font-weight:500; text-transform:none; letter-spacing:0; color:#BDB2A0; }
+.data-table td { padding:10px 6px; border-bottom:1px solid #F0E9DD; }
+.data-table .num { text-align:right; font-variant-numeric:tabular-nums; }
+.data-table .pos { color:#1F7A43; }
+.data-table .neg { color:#B5322E; }
+.empty { color:#9A8E7E; text-align:center; padding:18px; }
+.tag-due { background:#FBE4E3; color:#B5322E; padding:2px 8px; border-radius:6px; font-weight:700; }
+.formula { margin-top:14px; background:#FAF6EF; border-radius:10px; padding:12px 14px; font-size:13px; color:#5E4A36; line-height:1.6; }
+
+.order-card { border:1px solid #E6DFD4; border-radius:12px; padding:14px; margin-bottom:12px; }
+.order-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.order-items { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+.chip { background:#F3ECE0; color:#5E4A36; font-size:12px; font-weight:600; padding:4px 10px; border-radius:20px; }
+.order-foot { display:flex; justify-content:space-between; align-items:center; font-size:13px; color:#5E4A36; gap:8px; flex-wrap:wrap; }
+.status { font-size:12px; font-weight:700; padding:3px 10px; border-radius:20px; }
+.s-REQUESTED { background:#F0E9DD; color:#8E7A5E; }
+.s-CONFIRMED { background:#E8EEF6; color:#3A5A82; }
+.s-SHIPPING { background:#FBF1DC; color:#9A6A1E; }
+.s-DELIVERED { background:#E3F3E8; color:#1F7A43; }
+.btn-mini { border:1px solid #B5322E; color:#B5322E; background:#fff; border-radius:8px; padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer; }
+.done-mark { color:#1F7A43; font-weight:700; font-size:13px; }
+.mode-pick { margin:14px 0; }
+.mode-pick label { display:block; border:1px solid #D8CDBD; border-radius:9px; padding:11px 12px; margin-bottom:6px; font-size:13px; font-weight:600; cursor:pointer; }
+.mode-pick label.on { border-color:#B5322E; background:#FBF1F0; color:#B5322E; }
+.toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#1E1A17; color:#fff; padding:13px 22px; border-radius:30px; font-size:14px; font-weight:600; box-shadow:0 8px 24px rgba(0,0,0,.25); z-index:99; }
+.loading { text-align:center; padding:40px; color:#9A8E7E; }
+.cost-input { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; margin-bottom:8px; }
+.cost-input label { font-size:13px; font-weight:600; }
+.cost-input .peso-field { width:160px; }
+.report-pl { font-size:14px; }
+.report-pl .pl-row { display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid #F0E9DD; }
+.report-pl .pl-row.total { border-top:2px solid #E6DFD4; border-bottom:none; font-weight:800; font-size:17px; padding-top:13px; margin-top:4px; }
+.report-pl b { font-variant-numeric:tabular-nums; }
+.filter-bar { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+.filter-bar select, .filter-bar input { border:1px solid #D8CDBD; border-radius:9px; padding:8px 10px; font-size:13px; }
+</style>
+</head>
+<body>
+<div id="root"><div class="loading">불러오는 중…</div></div>
+
+<script>
+// ════════════════════════════════════════════════════════
+//  ① 여기에 Supabase 정보를 넣으세요
+//     Supabase 대시보드 → Project Settings → API 에서 복사
+// ════════════════════════════════════════════════════════
+const SUPABASE_URL = "https://wxdjxzfugfcsocprwmiy.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4ZGp4emZ1Z2Zjc29jcHJ3bWl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExOTQ5ODcsImV4cCI6MjA5Njc3MDk4N30.Vu6goB_2XvQj0gvTgJpHbTMeAbBaYdeboGCjQNxpnVE";
+// ════════════════════════════════════════════════════════
+
+const PESO = "₱";
+const fmt = (n) => PESO + (Number(n) || 0).toLocaleString("en-PH");
+const today = () => new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD
+const thisMonth = () => today().slice(0, 7);
+const $ = (id) => document.getElementById(id);
+
+const STATUS_LABEL = { REQUESTED:"요청", CONFIRMED:"확인", SHIPPING:"배송중", DELIVERED:"배송완료" };
+const STATUS_FLOW = ["REQUESTED","CONFIRMED","SHIPPING","DELIVERED"];
+
+let sb = null;
+const state = {
+  user: null,        // { branchId(0=본사), name, type }
+  branches: [], menus: [], kits: [],
+  tab: null,
+};
+
+// ── 초기화 ──────────────────────────────────────
+async function init() {
+  if (SUPABASE_URL.includes("여기에") || SUPABASE_ANON_KEY.includes("여기에")) {
+    renderSetup(); return;
+  }
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  try {
+    const [b, m, k] = await Promise.all([
+      sb.from("branches").select("*").order("id"),
+      sb.from("menus").select("*").eq("active", true).order("id"),
+      sb.from("kit_items").select("*").order("id"),
+    ]);
+    if (b.error) throw b.error;
+    state.branches = b.data || [];
+    state.menus = m.data || [];
+    state.kits = k.data || [];
+    renderLogin();
+  } catch (e) {
+    $("root").innerHTML = `<div class="login-wrap"><div class="login-card">
+      <div class="setup-note">DB 연결은 됐지만 테이블을 읽지 못했어요. Supabase SQL 편집기에서 설정 SQL을 실행했는지 확인해주세요.<br><br>오류: ${e.message}</div></div></div>`;
+  }
+}
+const branchOf = (id) => state.branches.find((b) => b.id === id);
+const menuById = (id) => state.menus.find((m) => m.id === id);
+const kitById = (id) => state.kits.find((k) => k.id === id);
+
+function toast(msg) {
+  const t = document.createElement("div");
+  t.className = "toast"; t.textContent = msg; document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2200);
+}
+
+// ── 설정 안내 화면 ───────────────────────────────
+function renderSetup() {
+  $("root").innerHTML = `<div class="login-wrap"><div class="login-card">
+    <div class="login-logo">K</div>
+    <h1>케이프드 통합 관리</h1>
+    <div class="sub">초기 설정 필요</div>
+    <div class="setup-note">
+      이 파일을 쓰려면 먼저 Supabase 연결이 필요해요.<br><br>
+      1. supabase.com 에서 프로젝트 생성<br>
+      2. SQL 편집기에 안내받은 설정 SQL 붙여넣고 실행<br>
+      3. Settings → API 에서 <b>Project URL</b>과 <b>anon key</b> 복사<br>
+      4. 이 HTML 파일 상단의 <b>SUPABASE_URL</b> / <b>SUPABASE_ANON_KEY</b> 자리에 붙여넣고 저장<br>
+      5. 다시 열기
+    </div>
+  </div></div>`;
+}
+
+// ── 로그인 ──────────────────────────────────────
+function renderLogin() {
+  const opts = ['<option value="0">본사 관리자</option>']
+    .concat(state.branches.map((b) => `<option value="${b.id}">${b.name} (${b.type==="DIRECT"?"직영":"가맹"})</option>`)).join("");
+  $("root").innerHTML = `<div class="login-wrap"><div class="login-card">
+    <div class="login-logo">K</div>
+    <h1>케이프드 통합 관리</h1>
+    <div class="sub">Korean Kitchen · Philippines</div>
+    <div id="loginErr"></div>
+    <div class="field"><label>접속 계정</label><select id="loginBranch">${opts}</select></div>
+    <div class="field"><label>PIN 번호</label><input id="loginPin" type="password" inputmode="numeric" placeholder="••••" /></div>
+    <button class="btn-primary" onclick="doLogin()">로그인</button>
+  </div></div>`;
+  $("loginPin").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+}
+
+async function doLogin() {
+  const id = Number($("loginBranch").value);
+  const pin = $("loginPin").value.trim();
+  const { data, error } = await sb.from("branches").select("*").eq("id", id).single();
+  if (error || !data) { $("loginErr").innerHTML = `<div class="err">계정을 찾을 수 없습니다.</div>`; return; }
+  if (String(data.pin) !== pin) { $("loginErr").innerHTML = `<div class="err">PIN이 올바르지 않습니다.</div>`; return; }
+  state.user = { branchId: id, name: data.name, type: data.type };
+  state.tab = id === 0 ? "dashboard" : "closing";
+  renderApp();
+}
+function logout() { state.user = null; renderLogin(); }
+
+// ── 앱 셸 ───────────────────────────────────────
+function renderApp() {
+  const u = state.user, hq = u.branchId === 0;
+  const tabs = hq
+    ? [["dashboard","지점 현황"],["settle","가맹점 정산"],["orders","밀키트 관리"],["report","월별 보고서"]]
+    : [["closing","마감 입력"],["myorder","밀키트 주문"]];
+  $("root").innerHTML = `
+    <div class="topbar">
+      <div class="brand"><div class="logo">K</div><div class="brand-name">케이프드 <span>통합 관리</span></div></div>
+      <div class="who"><div class="who-name">${hq?"본사 관리자":u.name}<small>${hq?"전체 관리":(u.type==="DIRECT"?"직영점":"가맹점")}</small></div>
+      <button class="logout" onclick="logout()">로그아웃</button></div>
+    </div>
+    <div class="tabs">${tabs.map(([k,l])=>`<button class="tab ${state.tab===k?'on':''}" onclick="go('${k}')">${l}</button>`).join("")}</div>
+    <div class="content" id="screen"><div class="loading">불러오는 중…</div></div>`;
+  renderScreen();
+}
+function go(t) { state.tab = t; renderApp(); }
+
+async function renderScreen() {
+  const t = state.tab;
+  if (t === "closing") return screenClosing();
+  if (t === "myorder") return screenMyOrder();
+  if (t === "dashboard") return screenDashboard();
+  if (t === "settle") return screenSettle();
+  if (t === "orders") return screenOrders();
+  if (t === "report") return screenReport();
+}
+
+// ── 마감 입력 ───────────────────────────────────
+const closingDraft = { qty:{}, cash:"", gcash:"", materials:[{name:"",amount:""}] };
+async function screenClosing() {
+  const b = state.user;
+  const { data: prev } = await sb.from("closings").select("date,cash,gcash").eq("branch_id", b.branchId).order("date",{ascending:false}).limit(3);
+  const d = closingDraft;
+  $("screen").innerHTML = `<div class="grid-2">
+    <div class="card">
+      <div class="card-head"><h2>${b.name} 일일 마감</h2><span class="date-pill">${today()}</span></div>
+      <div class="section-label">메뉴별 판매 수량</div>
+      <div id="menuRows">${state.menus.map(menuRowHTML).join("")}</div>
+      <div class="section-label">현지 자재 구매 (선택)</div>
+      <div id="matRows">${d.materials.map(matRowHTML).join("")}</div>
+    </div>
+    <div class="card sticky">
+      <h2>수입 입력 & 검증</h2>
+      <div class="pay-input"><label>현금 (Cash)</label><div class="peso-field"><span>${PESO}</span><input id="cash" type="number" inputmode="numeric" placeholder="0" value="${d.cash}" oninput="onPay()"></div></div>
+      <div class="pay-input"><label>지캐시 (GCash)</label><div class="peso-field"><span>${PESO}</span><input id="gcash" type="number" inputmode="numeric" placeholder="0" value="${d.gcash}" oninput="onPay()"></div></div>
+      <div class="reconcile">
+        <div class="rec-row"><span>메뉴 판매 합계</span><b id="menuTotal">${PESO}0</b></div>
+        <div class="rec-row"><span>실제 수입 합계</span><b id="recvTotal">${PESO}0</b></div>
+        <div class="rec-flag idle" id="flag">메뉴 수량을 입력하세요</div>
+      </div>
+      <button class="btn-primary" id="saveBtn" disabled onclick="saveClosing()">마감 저장</button>
+      <p class="hint">메뉴 합계와 현금+GCash가 맞아야 정상 마감입니다. 차액이 있으면 빨간색으로 표시돼요.</p>
+      ${prev&&prev.length?`<div class="section-label">이전 마감</div>${prev.map(p=>`<div class="prev-row"><span>${p.date}</span><b>${fmt(p.cash+p.gcash)}</b></div>`).join("")}`:""}
+    </div></div>`;
+  recalc();
+}
+function menuRowHTML(m){const q=closingDraft.qty[m.id]||0;return `<div class="menu-row">
+  <span class="m-name">${m.name}</span><span class="m-price">${fmt(m.price)}</span>
+  <div class="stepper"><button onclick="stepQty('${m.id}',-1)">−</button>
+  <input type="number" inputmode="numeric" id="q_${m.id}" value="${q||''}" placeholder="0" oninput="setQty('${m.id}',this.value)">
+  <button onclick="stepQty('${m.id}',1)">+</button></div>
+  <span class="m-sub" id="sub_${m.id}">${q>0?fmt(q*m.price):"—"}</span></div>`;}
+function matRowHTML(mat,i){const last=i===closingDraft.materials.length-1;return `<div class="mat-row">
+  <input placeholder="품목 (예: 양파·파)" value="${mat.name}" oninput="setMat(${i},'name',this.value)">
+  <input type="number" inputmode="numeric" placeholder="금액" value="${mat.amount}" oninput="setMat(${i},'amount',this.value)">
+  <button class="mat-add" onclick="${last?`addMat()`:`delMat(${i})`}">${last?"+":"−"}</button></div>`;}
+function setQty(id,v){closingDraft.qty[id]=Number(v)||0; const m=menuById(id); $("sub_"+id).textContent=closingDraft.qty[id]>0?fmt(closingDraft.qty[id]*m.price):"—"; recalc();}
+function stepQty(id,delta){const q=Math.max(0,(closingDraft.qty[id]||0)+delta);closingDraft.qty[id]=q;$("q_"+id).value=q||"";const m=menuById(id);$("sub_"+id).textContent=q>0?fmt(q*m.price):"—";recalc();}
+function setMat(i,f,v){closingDraft.materials[i][f]=v;}
+function addMat(){closingDraft.materials.push({name:"",amount:""});$("matRows").innerHTML=closingDraft.materials.map(matRowHTML).join("");}
+function delMat(i){closingDraft.materials.splice(i,1);$("matRows").innerHTML=closingDraft.materials.map(matRowHTML).join("");}
+function onPay(){closingDraft.cash=$("cash").value;closingDraft.gcash=$("gcash").value;recalc();}
+function recalc(){
+  const menuTotal=state.menus.reduce((s,m)=>s+(closingDraft.qty[m.id]||0)*m.price,0);
+  const recv=(Number(closingDraft.cash)||0)+(Number(closingDraft.gcash)||0);
+  const diff=recv-menuTotal, has=menuTotal>0;
+  $("menuTotal").textContent=fmt(menuTotal); $("recvTotal").textContent=fmt(recv);
+  const f=$("flag");
+  if(!has){f.className="rec-flag idle";f.textContent="메뉴 수량을 입력하세요";}
+  else if(diff===0){f.className="rec-flag ok";f.textContent="✓ 일치합니다";}
+  else{f.className="rec-flag bad";f.textContent=`차액 ${diff>0?"+":""}${fmt(diff)} — 확인 필요`;}
+  $("saveBtn").disabled=!has;
+}
+async function saveClosing(){
+  const items={}; state.menus.forEach(m=>{if((closingDraft.qty[m.id]||0)>0)items[m.id]=closingDraft.qty[m.id];});
+  const mats=closingDraft.materials.filter(x=>x.name&&x.amount).map(x=>({name:x.name,amount:Number(x.amount)}));
+  $("saveBtn").disabled=true;
+  const { error } = await sb.from("closings").insert({
+    branch_id: state.user.branchId, date: today(), items,
+    cash: Number(closingDraft.cash)||0, gcash: Number(closingDraft.gcash)||0, materials: mats,
+  });
+  if(error){toast("저장 실패: "+error.message);$("saveBtn").disabled=false;return;}
+  toast("마감이 저장되었습니다");
+  closingDraft.qty={};closingDraft.cash="";closingDraft.gcash="";closingDraft.materials=[{name:"",amount:""}];
+  screenClosing();
+}
+
+// ── 밀키트 주문 (호점) ───────────────────────────
+const orderDraft = { qty:{}, mode:"NET" };
+async function screenMyOrder(){
+  const b=state.user;
+  const { data: orders } = await sb.from("kit_orders").select("*").eq("branch_id", b.branchId).order("id",{ascending:false});
+  $("screen").innerHTML=`<div class="grid-2">
+    <div class="card"><h2>${b.name} 밀키트 주문</h2>
+      <div id="kitRows">${state.kits.map(kitRowHTML).join("")}</div>
+      ${b.type==="FRANCHISE"?`<div class="mode-pick"><div class="section-label">대금 처리 방식</div>
+        <label class="${orderDraft.mode==="NET"?"on":""}" onclick="setMode('NET')"><input type="radio" ${orderDraft.mode==="NET"?"checked":""}> GCash 매출에서 차감</label>
+        <label class="${orderDraft.mode==="SEPARATE"?"on":""}" onclick="setMode('SEPARATE')"><input type="radio" ${orderDraft.mode==="SEPARATE"?"checked":""}> 별도 송금</label></div>`:""}
+      <div class="rec-row big"><span>주문 합계</span><b id="orderTotal">${PESO}0</b></div>
+      <button class="btn-primary" id="orderBtn" disabled onclick="submitOrder()">본사에 주문 요청</button>
+    </div>
+    <div class="card"><h2>주문 현황</h2>${orders&&orders.length?orders.map(orderCardHTML).join(""):'<p class="empty">아직 주문 내역이 없습니다.</p>'}</div>
+  </div>`;
+  recalcOrder();
+}
+function kitRowHTML(k){const q=orderDraft.qty[k.id]||0;return `<div class="menu-row">
+  <span class="m-name">${k.name}</span><span class="m-price">${fmt(k.unit_price)}</span>
+  <div class="stepper"><button onclick="stepKit('${k.id}',-1)">−</button>
+  <input type="number" inputmode="numeric" id="k_${k.id}" value="${q||''}" placeholder="0" oninput="setKit('${k.id}',this.value)">
+  <button onclick="stepKit('${k.id}',1)">+</button></div>
+  <span class="m-sub" id="ksub_${k.id}">${q>0?fmt(q*k.unit_price):"—"}</span></div>`;}
+function orderCardHTML(o){return `<div class="order-card"><div class="order-top"><span class="muted">${o.date}</span><span class="status s-${o.status}">${STATUS_LABEL[o.status]}</span></div>
+  <div class="order-items">${o.items.map(it=>`<span class="chip">${kitById(it.kitId)?.name||""} × ${it.qty}</span>`).join("")}</div></div>`;}
+function setKit(id,v){orderDraft.qty[id]=Number(v)||0;const k=kitById(id);$("ksub_"+id).textContent=orderDraft.qty[id]>0?fmt(orderDraft.qty[id]*k.unit_price):"—";recalcOrder();}
+function stepKit(id,d){const q=Math.max(0,(orderDraft.qty[id]||0)+d);orderDraft.qty[id]=q;$("k_"+id).value=q||"";const k=kitById(id);$("ksub_"+id).textContent=q>0?fmt(q*k.unit_price):"—";recalcOrder();}
+function setMode(m){orderDraft.mode=m;screenMyOrder();}
+function recalcOrder(){const t=state.kits.reduce((s,k)=>s+(orderDraft.qty[k.id]||0)*k.unit_price,0);$("orderTotal").textContent=fmt(t);$("orderBtn").disabled=t===0;}
+async function submitOrder(){
+  const items=state.kits.filter(k=>(orderDraft.qty[k.id]||0)>0).map(k=>({kitId:k.id,qty:orderDraft.qty[k.id]}));
+  if(!items.length)return;
+  $("orderBtn").disabled=true;
+  const { error } = await sb.from("kit_orders").insert({
+    branch_id: state.user.branchId, date: today(), items, status:"REQUESTED",
+    settle_mode: state.user.type==="FRANCHISE"?orderDraft.mode:"NET",
+  });
+  if(error){toast("주문 실패: "+error.message);return;}
+  toast("주문이 접수되었습니다");
+  orderDraft.qty={};screenMyOrder();
+}
+
+// ── 본사: 지점 현황 ──────────────────────────────
+async function screenDashboard(){
+  const { data: closings } = await sb.from("closings").select("*");
+  const cs = closings||[];
+  const per = state.branches.map(b=>{
+    const my=cs.filter(c=>c.branch_id===b.id);
+    const cash=my.reduce((s,c)=>s+Number(c.cash),0), gcash=my.reduce((s,c)=>s+Number(c.gcash),0);
+    return {...b,cash,gcash,total:cash+gcash};
+  });
+  const grand=per.reduce((s,b)=>s+b.total,0), gcashTotal=per.reduce((s,b)=>s+b.gcash,0);
+  const maxT=Math.max(...per.map(b=>b.total),1);
+  const rank={}; cs.forEach(c=>Object.entries(c.items).forEach(([id,q])=>rank[id]=(rank[id]||0)+q));
+  const ranked=Object.entries(rank).map(([id,q])=>({name:menuById(id)?.name||id,q,rev:q*(menuById(id)?.price||0)})).sort((a,b)=>b.rev-a.rev);
+  $("screen").innerHTML=`
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-label">전 지점 매출</div><div class="kpi-value">${fmt(grand)}</div></div>
+      <div class="kpi accent"><div class="kpi-label">GCash 수입 (본사 계좌)</div><div class="kpi-value">${fmt(gcashTotal)}</div></div>
+      <div class="kpi"><div class="kpi-label">현금 수입 (지점 보유)</div><div class="kpi-value">${fmt(grand-gcashTotal)}</div></div>
+    </div>
+    <div class="grid-2">
+      <div class="card"><h2>지점별 매출</h2>${per.map(b=>`<div class="bar-row">
+        <span class="bar-name">${b.name}<span class="badge ${b.type.toLowerCase()}">${b.type==="DIRECT"?"직영":"가맹"}</span></span>
+        <div class="bar-track"><div class="bar-fill" style="width:${(b.total/maxT)*100}%"></div></div>
+        <span class="bar-val">${fmt(b.total)}</span></div>`).join("")}</div>
+      <div class="card"><h2>메뉴 판매 순위</h2><table class="data-table"><thead><tr><th>메뉴</th><th>판매</th><th>매출</th></tr></thead><tbody>
+        ${ranked.length?ranked.map(m=>`<tr><td>${m.name}</td><td>${m.q}개</td><td>${fmt(m.rev)}</td></tr>`).join(""):'<tr><td colspan="3" class="empty">아직 마감 데이터가 없습니다</td></tr>'}
+      </tbody></table></div>
+    </div>`;
+}
+
+// ── 본사: 가맹점 정산 ────────────────────────────
+async function screenSettle(){
+  const [{data:closings},{data:orders}]=await Promise.all([
+    sb.from("closings").select("branch_id,gcash"),
+    sb.from("kit_orders").select("branch_id,items,settle_mode"),
+  ]);
+  const fr=state.branches.filter(b=>b.type==="FRANCHISE");
+  const rows=fr.map(b=>{
+    const gcash=(closings||[]).filter(c=>c.branch_id===b.id).reduce((s,c)=>s+Number(c.gcash),0);
+    const bo=(orders||[]).filter(o=>o.branch_id===b.id);
+    const kitSum=(o)=>o.items.reduce((a,it)=>a+(kitById(it.kitId)?.unit_price||0)*it.qty,0);
+    const net=bo.filter(o=>o.settle_mode==="NET").reduce((s,o)=>s+kitSum(o),0);
+    const sep=bo.filter(o=>o.settle_mode==="SEPARATE").reduce((s,o)=>s+kitSum(o),0);
+    return {...b,gcash,net,sep,payout:gcash-net};
+  });
+  $("screen").innerHTML=`<div class="card">
+    <div class="card-head"><h2>가맹점 정산</h2><span class="muted">GCash 매출은 본사 계좌로 입금 → 밀키트 대금 차감 후 송금</span></div>
+    <table class="data-table"><thead><tr><th>가맹점</th><th>GCash 매출<small>본사→지점</small></th><th>밀키트(차감)<small>지점→본사</small></th><th>순 송금액</th><th>별도 청구(미수)</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td><b>${r.name}</b></td><td class="num pos">${fmt(r.gcash)}</td><td class="num neg">− ${fmt(r.net)}</td><td class="num"><b>${fmt(r.payout)}</b></td><td class="num">${r.sep>0?`<span class="tag-due">${fmt(r.sep)}</span>`:"—"}</td></tr>`).join("")}
+    </tbody></table>
+    <div class="formula"><b>순 송금액</b> = GCash 매출 − 차감 선택한 밀키트 대금 &nbsp;|&nbsp; 별도 청구분은 송금에서 빼고 <b>미수금</b>으로 관리</div>
+  </div>`;
+}
+
+// ── 본사: 밀키트 관리 ────────────────────────────
+async function screenOrders(){
+  const { data: orders } = await sb.from("kit_orders").select("*").order("id",{ascending:false});
+  const list=(orders||[]).map(o=>{
+    const b=branchOf(o.branch_id);
+    const total=o.items.reduce((s,it)=>s+(kitById(it.kitId)?.unit_price||0)*it.qty,0);
+    const next=STATUS_FLOW[STATUS_FLOW.indexOf(o.status)+1];
+    return `<div class="order-card"><div class="order-top">
+      <div><b>${b?.name||""}</b> <span class="muted">· ${o.date}</span> <span class="badge ${b?.type.toLowerCase()}">${b?.type==="DIRECT"?"직영":"가맹"}</span></div>
+      <span class="status s-${o.status}">${STATUS_LABEL[o.status]}</span></div>
+      <div class="order-items">${o.items.map(it=>`<span class="chip">${kitById(it.kitId)?.name||""} × ${it.qty}</span>`).join("")}</div>
+      <div class="order-foot"><span>대금 <b>${fmt(total)}</b> · ${o.settle_mode==="NET"?"GCash 차감":"별도 청구"}</span>
+      ${o.status!=="DELIVERED"?`<button class="btn-mini" onclick="advanceOrder(${o.id},'${next}')">${STATUS_LABEL[next]}(으)로 →</button>`:'<span class="done-mark">완료</span>'}</div></div>`;
+  }).join("");
+  $("screen").innerHTML=`<div class="card"><h2>밀키트 주문 관리</h2>${list||'<p class="empty">주문이 없습니다.</p>'}</div>`;
+}
+async function advanceOrder(id,next){
+  const { error } = await sb.from("kit_orders").update({status:next}).eq("id",id);
+  if(error){toast("변경 실패: "+error.message);return;}
+  screenOrders();
+}
+
+// ── 본사: 월별 보고서 ────────────────────────────
+async function screenReport(){
+  const month=state._reportMonth||thisMonth();
+  const branchId=state._reportBranch??state.branches[0]?.id;
+  state._reportMonth=month; state._reportBranch=branchId;
+  const start=month+"-01", end=month+"-31";
+  const [{data:cs},{data:fc}]=await Promise.all([
+    sb.from("closings").select("*").eq("branch_id",branchId).gte("date",start).lte("date",end),
+    sb.from("fixed_costs").select("*").eq("branch_id",branchId).eq("month",month),
+  ]);
+  const closings=cs||[];
+  const sales=closings.reduce((s,c)=>s+Number(c.cash)+Number(c.gcash),0);
+  const matCost=closings.reduce((s,c)=>s+(c.materials||[]).reduce((a,m)=>a+Number(m.amount),0),0);
+  const fixed=(fc&&fc[0])||{rent:0,labor:0,other:0};
+  const fixedTotal=Number(fixed.rent)+Number(fixed.labor)+Number(fixed.other);
+  const profit=sales-matCost-fixedTotal;
+  const branchOpts=state.branches.map(b=>`<option value="${b.id}" ${b.id===branchId?"selected":""}>${b.name}</option>`).join("");
+  $("screen").innerHTML=`
+    <div class="filter-bar">
+      <select onchange="state._reportBranch=Number(this.value);screenReport()">${branchOpts}</select>
+      <input type="month" value="${month}" onchange="state._reportMonth=this.value;screenReport()">
+    </div>
+    <div class="grid-2">
+      <div class="card"><h2>${branchOf(branchId)?.name} · ${month} 손익</h2>
+        <div class="report-pl">
+          <div class="pl-row"><span>매출 (현금+GCash)</span><b>${fmt(sales)}</b></div>
+          <div class="pl-row"><span>− 현지 자재비</span><b>${fmt(matCost)}</b></div>
+          <div class="pl-row"><span>− 고정비 (월세·인건비·기타)</span><b>${fmt(fixedTotal)}</b></div>
+          <div class="pl-row total"><span>순이익</span><b style="color:${profit>=0?'#1F7A43':'#B5322E'}">${fmt(profit)}</b></div>
+        </div>
+        <p class="hint">마감 ${closings.length}건 집계 · 밀키트 대금은 정산 화면에서 별도 관리</p>
+      </div>
+      <div class="card"><h2>고정비 입력</h2>
+        <div class="cost-input"><label>월세</label><div class="peso-field"><span>${PESO}</span><input type="number" id="fcRent" value="${fixed.rent||''}" placeholder="0"></div></div>
+        <div class="cost-input"><label>인건비</label><div class="peso-field"><span>${PESO}</span><input type="number" id="fcLabor" value="${fixed.labor||''}" placeholder="0"></div></div>
+        <div class="cost-input"><label>기타</label><div class="peso-field"><span>${PESO}</span><input type="number" id="fcOther" value="${fixed.other||''}" placeholder="0"></div></div>
+        <button class="btn-primary" onclick="saveFixed(${branchId},'${month}')">고정비 저장</button>
+        <p class="hint">${branchOf(branchId)?.name}의 ${month} 고정비입니다. 매월 갱신하세요.</p>
+      </div>
+    </div>`;
+}
+async function saveFixed(branchId,month){
+  const row={branch_id:branchId,month,rent:Number($("fcRent").value)||0,labor:Number($("fcLabor").value)||0,other:Number($("fcOther").value)||0};
+  const { error } = await sb.from("fixed_costs").upsert(row,{onConflict:"branch_id,month"});
+  if(error){toast("저장 실패: "+error.message);return;}
+  toast("고정비가 저장되었습니다");
+  screenReport();
+}
+
+init();
+</script>
+</body>
+</html>
