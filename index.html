@@ -129,6 +129,12 @@ input, select, button { font-family: inherit; }
 .ebar-fill { background:linear-gradient(90deg,#E0A93F,#C9842A); height:100%; }
 .ebar-val { font-size:13px; font-weight:700; font-variant-numeric:tabular-nums; min-width:66px; text-align:right; }
 .pl-sub { padding-left:14px; color:#9A8E7E; font-size:13px; }
+.legend { display:flex; gap:18px; margin-bottom:6px; }
+.legend span { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:#5E4A36; }
+.legend i { width:11px; height:11px; border-radius:3px; display:inline-block; }
+.cmp-table tr.me { background:#FBF1F0; }
+.cmp-table tr.me td:first-child { font-weight:800; color:#B5322E; }
+.minibar { display:inline-block; height:8px; border-radius:4px; background:linear-gradient(90deg,#C9453F,#B5322E); vertical-align:middle; margin-right:6px; }
 </style>
 </head>
 <body>
@@ -437,12 +443,54 @@ async function monthSE(branchId,month){
   const byCat={}; expenses.forEach(e=>byCat[e.category]=(byCat[e.category]||0)+Number(e.amount));
   return {cash,gcash,sales,expTotal,profit:sales-expTotal,byCat,days:closings.length};
 }
+function monthsEnding(month,count){ const [y,m]=month.split("-").map(Number); const arr=[]; for(let k=count-1;k>=0;k--){ let yy=y,mm=m-k; while(mm<=0){mm+=12;yy--;} arr.push(`${yy}-${String(mm).padStart(2,"0")}`);} return arr; }
+async function fetchTrend(branchId,months){
+  const start=months[0]+"-01"; const {end}=monthBounds(months[months.length-1]);
+  const [{data:cs},{data:ex}]=await Promise.all([
+    sb.from("closings").select("cash,gcash,date").eq("branch_id",branchId).gte("date",start).lt("date",end),
+    sb.from("expenses").select("amount,date").eq("branch_id",branchId).gte("date",start).lt("date",end),
+  ]);
+  const sales={},exp={}; months.forEach(m=>{sales[m]=0;exp[m]=0;});
+  (cs||[]).forEach(c=>{const k=c.date.slice(0,7); if(k in sales)sales[k]+=Number(c.cash)+Number(c.gcash);});
+  (ex||[]).forEach(e=>{const k=e.date.slice(0,7); if(k in exp)exp[k]+=Number(e.amount);});
+  return months.map(m=>({m,sales:sales[m],exp:exp[m],profit:sales[m]-exp[m]}));
+}
+async function fetchAllBranchMonth(month){
+  const {start,end}=monthBounds(month);
+  const [{data:cs},{data:ex}]=await Promise.all([
+    sb.from("closings").select("branch_id,cash,gcash").gte("date",start).lt("date",end),
+    sb.from("expenses").select("branch_id,amount").gte("date",start).lt("date",end),
+  ]);
+  return state.branches.filter(b=>b.id!==0).map(b=>{
+    const sales=(cs||[]).filter(c=>c.branch_id===b.id).reduce((s,c)=>s+Number(c.cash)+Number(c.gcash),0);
+    const expt=(ex||[]).filter(e=>e.branch_id===b.id).reduce((s,e)=>s+Number(e.amount),0);
+    return {...b,sales,exp:expt,profit:sales-expt,margin:sales>0?(sales-expt)/sales*100:0};
+  });
+}
+function kfmt(n){ n=Number(n)||0; const a=Math.abs(n); if(a>=1000) return PESO+(n/1000).toFixed(a%1000===0?0:1)+"k"; return PESO+Math.round(n); }
+function svgTrend(labels, series){
+  const W=720,H=300,pl=54,pr=18,pt=22,pb=32, iw=W-pl-pr, ih=H-pt-pb, ny=4;
+  const allv=series.flatMap(s=>s.values); let max=Math.max(...allv,1); const min=Math.min(0,...allv);
+  const x=i=>pl+(labels.length<=1?iw/2:iw*i/(labels.length-1));
+  const y=v=>pt+ih-((v-min)/((max-min)||1))*ih;
+  let grid="",ylab="";
+  for(let i=0;i<=ny;i++){ const val=min+(max-min)*i/ny, yy=pt+ih-(ih*i/ny);
+    grid+=`<line x1="${pl}" y1="${yy.toFixed(1)}" x2="${W-pr}" y2="${yy.toFixed(1)}" stroke="#EEE6DA"/>`;
+    ylab+=`<text x="${pl-8}" y="${(yy+4).toFixed(1)}" text-anchor="end" font-size="11" fill="#9A8E7E">${kfmt(val)}</text>`; }
+  const xlab=labels.map((l,i)=>`<text x="${x(i).toFixed(1)}" y="${H-10}" text-anchor="middle" font-size="11" fill="#9A8E7E">${l}</text>`).join("");
+  const paths=series.map(s=>{
+    const pts=s.values.map((v,i)=>`${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+    const dots=s.values.map((v,i)=>`<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3.5" fill="${s.color}"/>`).join("");
+    return `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round"/>${dots}`; }).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;">${grid}${ylab}${paths}${xlab}</svg>`;
+}
 async function screenReport(){
   const month=state._reportMonth||thisMonth();
   const branchId=state._reportBranch??state.branches.find(b=>b.id!==0)?.id;
   state._reportMonth=month; state._reportBranch=branchId;
   const {prev}=monthBounds(month);
-  const [cur,pre]=await Promise.all([monthSE(branchId,month),monthSE(branchId,prev)]);
+  const months6=monthsEnding(month,6);
+  const [cur,pre,trend,allb]=await Promise.all([monthSE(branchId,month),monthSE(branchId,prev),fetchTrend(branchId,months6),fetchAllBranchMonth(month)]);
   const margin=cur.sales>0?(cur.profit/cur.sales*100):0;
   const preMargin=pre.sales>0?(pre.profit/pre.sales*100):0;
   const delta=(c,p,invert)=>{ if(!p) return {t:"전월 데이터 없음",c:"flat"}; const d=(c-p)/Math.abs(p)*100; let cls=d>0?"up":d<0?"down":"flat"; if(invert)cls=d>0?"down":d<0?"up":"flat"; return {t:`${d>=0?"▲":"▼"} ${Math.abs(d).toFixed(0)}% (전월 대비)`,c:cls}; };
@@ -453,6 +501,17 @@ async function screenReport(){
     <div class="ebar-row"><span class="ebar-name">${c}</span>
     <div class="ebar-track"><div class="ebar-fill" style="width:${(cur.byCat[c]/maxE)*100}%"></div></div>
     <span class="ebar-val">${fmt(cur.byCat[c])}</span></div>`).join("")||'<p class="hint">등록된 지출이 없습니다.</p>';
+  const trendLabels=trend.map(t=>Number(t.m.slice(5))+"월");
+  const trendSvg=svgTrend(trendLabels,[{name:"매출",color:"#B5322E",values:trend.map(t=>t.sales)},{name:"순이익",color:"#1F7A43",values:trend.map(t=>t.profit)}]);
+  const sortedAll=[...allb].sort((a,b)=>b.sales-a.sales);
+  const maxSalesAll=Math.max(...allb.map(b=>b.sales),1);
+  const cmpRows=sortedAll.map(b=>`<tr class="${b.id===branchId?'me':''}">
+    <td>${b.name} <span class="badge ${b.type.toLowerCase()}">${b.type==="DIRECT"?"직영":"가맹"}</span></td>
+    <td class="num"><span class="minibar" style="width:${Math.max(4,(b.sales/maxSalesAll)*70)}px"></span>${fmt(b.sales)}</td>
+    <td class="num neg">${fmt(b.exp)}</td>
+    <td class="num"><b style="color:${b.profit>=0?'#1F7A43':'#B5322E'}">${fmt(b.profit)}</b></td>
+    <td class="num">${b.margin.toFixed(0)}%</td></tr>`).join("");
+  const totSales=allb.reduce((s,b)=>s+b.sales,0), totProfit=allb.reduce((s,b)=>s+b.profit,0);
   $("screen").innerHTML=`
     <div class="filter-bar">
       <select onchange="state._reportBranch=Number(this.value);screenReport()">${branchOpts}</select>
@@ -464,6 +523,12 @@ async function screenReport(){
       <div class="kpi"><div class="kpi-label">지출</div><div class="kpi-value">${fmt(cur.expTotal)}</div><div class="delta ${dE.c}">${dE.t}</div></div>
       <div class="kpi accent"><div class="kpi-label">순이익</div><div class="kpi-value">${fmt(cur.profit)}</div><div class="delta ${dP.c}">${dP.t}</div></div>
       <div class="kpi"><div class="kpi-label">이익률</div><div class="kpi-value">${margin.toFixed(1)}%</div><div class="delta flat">전월 ${preMargin.toFixed(1)}%</div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>최근 6개월 추세</h2>
+        <div class="legend"><span><i style="background:#B5322E"></i>매출</span><span><i style="background:#1F7A43"></i>순이익</span></div>
+      </div>
+      ${trendSvg}
     </div>
     <div class="grid-2">
       <div class="card"><h2>손익 요약</h2>
@@ -477,6 +542,13 @@ async function screenReport(){
         <p class="hint">마감 ${cur.days}일 집계 · 밀키트 대금은 정산 화면에서 별도 관리</p>
       </div>
       <div class="card"><h2>지출 항목별 내역</h2>${ebars}</div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>전 지점 비교 · ${month.replace("-",". ")}</h2><span class="muted">매출순 정렬 · 현재 선택 지점 강조</span></div>
+      <table class="data-table cmp-table"><thead><tr><th>지점</th><th>매출</th><th>지출</th><th>순이익</th><th>이익률</th></tr></thead>
+      <tbody>${cmpRows}</tbody>
+      <tfoot><tr style="border-top:2px solid #E6DFD4"><td><b>전체 합계</b></td><td class="num"><b>${fmt(totSales)}</b></td><td class="num neg">${fmt(allb.reduce((s,b)=>s+b.exp,0))}</td><td class="num"><b style="color:${totProfit>=0?'#1F7A43':'#B5322E'}">${fmt(totProfit)}</b></td><td class="num">${totSales>0?(totProfit/totSales*100).toFixed(0):0}%</td></tr></tfoot>
+      </table>
     </div>`;
 }
 
