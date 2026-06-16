@@ -135,6 +135,18 @@ input, select, button { font-family: inherit; }
 .cmp-table tr.me { background:#FBF1F0; }
 .cmp-table tr.me td:first-child { font-weight:800; color:#B5322E; }
 .minibar { display:inline-block; height:8px; border-radius:4px; background:linear-gradient(90deg,#C9453F,#B5322E); vertical-align:middle; margin-right:6px; }
+.menu-head { display:grid; grid-template-columns:1fr auto auto 60px 64px; gap:10px; font-size:11px; color:#9A8E7E; font-weight:700; text-transform:uppercase; letter-spacing:.4px; padding:0 0 6px; border-bottom:2px solid #E6DFD4; margin-bottom:4px; }
+.menu-head span:not(:first-child){ text-align:center; }
+.menu-row.promo-row { grid-template-columns:1fr auto auto 60px 64px; }
+.m-en { display:block; font-size:11px; color:#9A8E7E; font-weight:500; font-style:normal; }
+.promo-box { width:60px; text-align:center; border:1px dashed #C9842A; border-radius:7px; padding:6px 4px; font-size:13px; font-variant-numeric:tabular-nums; background:#FFFDF8; }
+.promo-box::placeholder { color:#D8CDBD; }
+.add-form { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; align-items:center; }
+.add-form input, .add-form select { border:1px solid #D8CDBD; border-radius:8px; padding:9px 10px; font-size:13px; }
+.add-form input { flex:1; min-width:80px; }
+.mng-row { display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #F0E9DD; font-size:14px; }
+.mng-price { font-weight:700; font-variant-numeric:tabular-nums; color:#5E4A36; }
+.mng-del { border:1px solid #E0C0BE; color:#B5322E; background:#fff; border-radius:7px; padding:5px 10px; font-size:12px; font-weight:600; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -167,18 +179,23 @@ async function init() {
   try {
     const [b, m, k] = await Promise.all([
       sb.from("branches").select("*").order("id"),
-      sb.from("menus").select("*").eq("active", true).order("id"),
+      sb.from("menus").select("*").order("sort").order("id"),
       sb.from("kit_items").select("*").order("id"),
     ]);
     if (b.error) throw b.error;
-    state.branches = b.data || []; state.menus = m.data || []; state.kits = k.data || [];
+    state.branches = b.data || [];
+    state.menusAll = m.data || [];
+    state.menus = state.menusAll.filter(x=>x.active!==false);
+    state.kits = k.data || [];
     renderLogin();
   } catch (e) {
     $("root").innerHTML = `<div class="login-wrap"><div class="login-card"><div class="setup-note">DB 연결은 됐지만 테이블을 읽지 못했어요. Supabase SQL 편집기에서 설정 SQL을 실행했는지 확인해주세요.<br><br>오류: ${e.message}</div></div></div>`;
   }
 }
 const branchOf = (id) => state.branches.find((b) => b.id === id);
-const menuById = (id) => state.menus.find((m) => m.id === id);
+const menuById = (id) => (state.menusAll||state.menus).find((m) => m.id === id);
+const itemQty = (v) => (v && typeof v==="object") ? Number(v.q||0) : Number(v||0);
+const itemRev = (v,m) => (v && typeof v==="object") ? Number(v.q||0)*Number(v.p||0) : Number(v||0)*(m?.price||0);
 const kitById = (id) => state.kits.find((k) => k.id === id);
 function toast(msg) { const t=document.createElement("div"); t.className="toast"; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2200); }
 
@@ -212,7 +229,7 @@ function logout() { state.user = null; renderLogin(); }
 function renderApp() {
   const u = state.user, hq = u.branchId === 0;
   const tabs = hq
-    ? [["dashboard","지점 현황"],["settle","가맹점 정산"],["orders","밀키트 관리"],["report","월별 보고서"]]
+    ? [["dashboard","지점 현황"],["settle","가맹점 정산"],["orders","밀키트 관리"],["report","월별 보고서"],["manage","관리"]]
     : [["closing","마감 입력"],["myorder","밀키트 주문"]];
   $("root").innerHTML = `
     <div class="topbar">
@@ -233,21 +250,28 @@ async function renderScreen() {
   if (t === "settle") return screenSettle();
   if (t === "orders") return screenOrders();
   if (t === "report") return screenReport();
+  if (t === "manage") return screenManage();
 }
 
 // ── 마감 입력 ───────────────────────────────────
-const closingDraft = { qty:{}, cash:"", gcash:"", expenses:[{category:"",amount:""}] };
+const closingDraft = { qty:{}, promo:{}, cash:"", gcash:"" };
+const CAT_LABEL = { GENERAL:"일반 메뉴", SINGLE:"단품 메뉴" };
+function unitPrice(m){ const p=Number(closingDraft.promo[m.id]); return p>0?p:m.price; }
 async function screenClosing() {
   const b = state.user;
   const { data: prev } = await sb.from("closings").select("date,cash,gcash").eq("branch_id", b.branchId).order("date",{ascending:false}).limit(3);
   const d = closingDraft;
+  const cats=["GENERAL","SINGLE"];
+  const menuHtml=cats.map(cat=>{
+    const ms=state.menus.filter(m=>(m.category||"GENERAL")===cat);
+    if(!ms.length) return "";
+    return `<div class="section-label">${CAT_LABEL[cat]||cat}</div><div>${ms.map(menuRowHTML).join("")}</div>`;
+  }).join("");
   $("screen").innerHTML = `<div class="grid-2">
     <div class="card">
       <div class="card-head"><h2>${b.name} 일일 마감</h2><span class="date-pill">${today()}</span></div>
-      <div class="section-label">메뉴별 판매 수량</div>
-      <div id="menuRows">${state.menus.map(menuRowHTML).join("")}</div>
-      <div class="section-label">오늘 지출 (선택)</div>
-      <div id="expRows">${d.expenses.map(expRowHTML).join("")}</div>
+      <div class="menu-head"><span>메뉴</span><span>기본가</span><span>수량</span><span>프로모</span><span>소계</span></div>
+      ${menuHtml}
     </div>
     <div class="card sticky">
       <h2>수입 입력 & 검증</h2>
@@ -259,31 +283,24 @@ async function screenClosing() {
         <div class="rec-flag idle" id="flag">메뉴 수량을 입력하세요</div>
       </div>
       <button class="btn-primary" id="saveBtn" disabled onclick="saveClosing()">마감 저장</button>
-      <p class="hint">메뉴 합계와 현금+GCash가 맞아야 정상 마감입니다. 차액은 빨간색으로 표시돼요.</p>
+      <p class="hint">프로모 칸에 가격을 넣으면 그 가격으로 계산됩니다(비우면 기본가). 메뉴 합계와 현금+GCash가 맞아야 정상 마감이에요.</p>
       ${prev&&prev.length?`<div class="section-label">이전 마감</div>${prev.map(p=>`<div class="prev-row"><span>${p.date}</span><b>${fmt(p.cash+p.gcash)}</b></div>`).join("")}`:""}
     </div></div>`;
   recalc();
 }
-function menuRowHTML(m){const q=closingDraft.qty[m.id]||0;return `<div class="menu-row">
-  <span class="m-name">${m.name}</span><span class="m-price">${fmt(m.price)}</span>
+function menuRowHTML(m){const q=closingDraft.qty[m.id]||0;return `<div class="menu-row promo-row">
+  <span class="m-name">${m.name}${m.name_en?`<em class="m-en">${m.name_en}</em>`:""}</span><span class="m-price">${fmt(m.price)}</span>
   <div class="stepper"><button onclick="stepQty('${m.id}',-1)">−</button>
   <input type="number" inputmode="numeric" id="q_${m.id}" value="${q||''}" placeholder="0" oninput="setQty('${m.id}',this.value)">
   <button onclick="stepQty('${m.id}',1)">+</button></div>
-  <span class="m-sub" id="sub_${m.id}">${q>0?fmt(q*m.price):"—"}</span></div>`;}
-function expRowHTML(ex,i){const last=i===closingDraft.expenses.length-1;
-  const opts=`<option value="">지출 항목 선택</option>`+EXPENSE_CATS.map(c=>`<option value="${c}" ${ex.category===c?"selected":""}>${c}</option>`).join("");
-  return `<div class="exp-row">
-  <select onchange="setExp(${i},'category',this.value)">${opts}</select>
-  <input type="number" inputmode="numeric" placeholder="금액" value="${ex.amount}" oninput="setExp(${i},'amount',this.value)">
-  <button class="exp-add" onclick="${last?`addExp()`:`delExp(${i})`}">${last?"+":"−"}</button></div>`;}
-function setQty(id,v){closingDraft.qty[id]=Number(v)||0; const m=menuById(id); $("sub_"+id).textContent=closingDraft.qty[id]>0?fmt(closingDraft.qty[id]*m.price):"—"; recalc();}
-function stepQty(id,delta){const q=Math.max(0,(closingDraft.qty[id]||0)+delta);closingDraft.qty[id]=q;$("q_"+id).value=q||"";const m=menuById(id);$("sub_"+id).textContent=q>0?fmt(q*m.price):"—";recalc();}
-function setExp(i,f,v){closingDraft.expenses[i][f]=v;}
-function addExp(){closingDraft.expenses.push({category:"",amount:""});$("expRows").innerHTML=closingDraft.expenses.map(expRowHTML).join("");}
-function delExp(i){closingDraft.expenses.splice(i,1);$("expRows").innerHTML=closingDraft.expenses.map(expRowHTML).join("");}
+  <input class="promo-box" type="number" inputmode="numeric" id="p_${m.id}" value="${closingDraft.promo[m.id]||''}" placeholder="${m.price}" oninput="setPromo('${m.id}',this.value)">
+  <span class="m-sub" id="sub_${m.id}">${q>0?fmt(q*unitPrice(m)):"—"}</span></div>`;}
+function setQty(id,v){closingDraft.qty[id]=Number(v)||0; const m=menuById(id); $("sub_"+id).textContent=closingDraft.qty[id]>0?fmt(closingDraft.qty[id]*unitPrice(m)):"—"; recalc();}
+function stepQty(id,delta){const q=Math.max(0,(closingDraft.qty[id]||0)+delta);closingDraft.qty[id]=q;$("q_"+id).value=q||"";const m=menuById(id);$("sub_"+id).textContent=q>0?fmt(q*unitPrice(m)):"—";recalc();}
+function setPromo(id,v){closingDraft.promo[id]=v; const m=menuById(id),q=closingDraft.qty[id]||0; $("sub_"+id).textContent=q>0?fmt(q*unitPrice(m)):"—"; recalc();}
 function onPay(){closingDraft.cash=$("cash").value;closingDraft.gcash=$("gcash").value;recalc();}
 function recalc(){
-  const menuTotal=state.menus.reduce((s,m)=>s+(closingDraft.qty[m.id]||0)*m.price,0);
+  const menuTotal=state.menus.reduce((s,m)=>s+(closingDraft.qty[m.id]||0)*unitPrice(m),0);
   const recv=(Number(closingDraft.cash)||0)+(Number(closingDraft.gcash)||0);
   const diff=recv-menuTotal, has=menuTotal>0;
   $("menuTotal").textContent=fmt(menuTotal); $("recvTotal").textContent=fmt(recv);
@@ -294,14 +311,13 @@ function recalc(){
   $("saveBtn").disabled=!has;
 }
 async function saveClosing(){
-  const items={}; state.menus.forEach(m=>{if((closingDraft.qty[m.id]||0)>0)items[m.id]=closingDraft.qty[m.id];});
+  const items={};
+  state.menus.forEach(m=>{ const q=closingDraft.qty[m.id]||0; if(q>0){ const pr=Number(closingDraft.promo[m.id]); items[m.id]= pr>0 ? {q, p:pr} : q; }});
   $("saveBtn").disabled=true;
   const { error } = await sb.from("closings").insert({ branch_id: state.user.branchId, date: today(), items, cash: Number(closingDraft.cash)||0, gcash: Number(closingDraft.gcash)||0 });
   if(error){toast("저장 실패: "+error.message);$("saveBtn").disabled=false;return;}
-  const exp=closingDraft.expenses.filter(x=>x.category&&x.amount).map(x=>({branch_id:state.user.branchId,date:today(),category:x.category,amount:Number(x.amount)}));
-  if(exp.length){ const r=await sb.from("expenses").insert(exp); if(r.error){toast("매출은 저장됐지만 지출 저장 실패: "+r.error.message);} }
   toast("마감이 저장되었습니다");
-  closingDraft.qty={};closingDraft.cash="";closingDraft.gcash="";closingDraft.expenses=[{category:"",amount:""}];
+  closingDraft.qty={};closingDraft.promo={};closingDraft.cash="";closingDraft.gcash="";
   screenClosing();
 }
 
@@ -355,8 +371,8 @@ async function screenDashboard(){
   });
   const grand=per.reduce((s,b)=>s+b.total,0), gcashTotal=per.reduce((s,b)=>s+b.gcash,0);
   const maxT=Math.max(...per.map(b=>b.total),1);
-  const rank={}; cs.forEach(c=>Object.entries(c.items).forEach(([id,q])=>rank[id]=(rank[id]||0)+q));
-  const ranked=Object.entries(rank).map(([id,q])=>({name:menuById(id)?.name||id,q,rev:q*(menuById(id)?.price||0)})).sort((a,b)=>b.rev-a.rev);
+  const rank={}; cs.forEach(c=>Object.entries(c.items).forEach(([id,v])=>{const o=rank[id]||(rank[id]={q:0,rev:0}); o.q+=itemQty(v); o.rev+=itemRev(v,menuById(id));}));
+  const ranked=Object.entries(rank).map(([id,o])=>({name:menuById(id)?.name||id,q:o.q,rev:o.rev})).sort((a,b)=>b.rev-a.rev);
   $("screen").innerHTML=`
     <div class="kpi-row">
       <div class="kpi"><div class="kpi-label">전 지점 매출</div><div class="kpi-value">${fmt(grand)}</div></div>
@@ -550,6 +566,93 @@ async function screenReport(){
       <tfoot><tr style="border-top:2px solid #E6DFD4"><td><b>전체 합계</b></td><td class="num"><b>${fmt(totSales)}</b></td><td class="num neg">${fmt(allb.reduce((s,b)=>s+b.exp,0))}</td><td class="num"><b style="color:${totProfit>=0?'#1F7A43':'#B5322E'}">${fmt(totProfit)}</b></td><td class="num">${totSales>0?(totProfit/totSales*100).toFixed(0):0}%</td></tr></tfoot>
       </table>
     </div>`;
+}
+
+// ── 본사: 관리 (메뉴 + 지출) ─────────────────────
+const manageState = { newCat:"GENERAL", expBranch:null, expMonth:null };
+async function screenManage(){
+  const ms=state.menus;
+  const grp=(cat)=>ms.filter(m=>(m.category||"GENERAL")===cat);
+  const menuList=(cat)=>grp(cat).map(m=>`<div class="mng-row">
+    <span>${m.name}${m.name_en?` <em class="m-en">${m.name_en}</em>`:""}</span>
+    <span class="mng-price">${fmt(m.price)}</span>
+    <button class="mng-del" onclick="delMenu('${m.id}','${m.name.replace(/'/g,"")}')">삭제</button></div>`).join("")||'<p class="hint">없음</p>';
+
+  const bId = manageState.expBranch ?? state.branches.find(b=>b.id!==0)?.id;
+  const month = manageState.expMonth ?? thisMonth();
+  manageState.expBranch=bId; manageState.expMonth=month;
+  const {start,end}=monthBounds(month);
+  const { data: exlist } = await sb.from("expenses").select("*").eq("branch_id",bId).gte("date",start).lt("date",end).order("date",{ascending:false});
+  const branchOpts=state.branches.filter(b=>b.id!==0).map(b=>`<option value="${b.id}" ${b.id===bId?"selected":""}>${b.name}</option>`).join("");
+  const catOpts=EXPENSE_CATS.map(c=>`<option value="${c}">${c}</option>`).join("");
+  const expRows=(exlist=>exlist&&exlist.length?exlist.map(e=>`<div class="mng-row">
+    <span>${e.date.slice(5)} · ${e.category}</span><span class="mng-price">${fmt(e.amount)}</span>
+    <button class="mng-del" onclick="delExpense(${e.id})">삭제</button></div>`).join(""):'<p class="hint">이 달 등록된 지출이 없습니다.</p>')(exlist);
+  const expTotal=(exlist||[]).reduce((s,e)=>s+Number(e.amount),0);
+
+  $("screen").innerHTML=`<div class="grid-2">
+    <div class="card">
+      <h2>메뉴 관리</h2>
+      <div class="add-form">
+        <input id="nmName" placeholder="메뉴명 (한글)">
+        <input id="nmEn" placeholder="영문명">
+        <input id="nmPrice" type="number" inputmode="numeric" placeholder="가격">
+        <select id="nmCat">
+          <option value="GENERAL">일반</option>
+          <option value="SINGLE">단품</option>
+        </select>
+        <button class="btn-mini" onclick="addMenu()">추가</button>
+      </div>
+      <div class="section-label">일반 메뉴</div>${menuList("GENERAL")}
+      <div class="section-label">단품 메뉴</div>${menuList("SINGLE")}
+    </div>
+    <div class="card">
+      <h2>지출 입력 · 관리 <span class="muted">(본사 전용)</span></h2>
+      <div class="filter-bar">
+        <select onchange="manageState.expBranch=Number(this.value);screenManage()">${branchOpts}</select>
+        <input type="month" value="${month}" onchange="manageState.expMonth=this.value;screenManage()">
+      </div>
+      <div class="add-form">
+        <input id="exDate" type="date" value="${today()}">
+        <select id="exCat">${catOpts}</select>
+        <input id="exAmt" type="number" inputmode="numeric" placeholder="금액">
+        <button class="btn-mini" onclick="addExpense(${bId})">추가</button>
+      </div>
+      <div class="rec-row big"><span>${month.replace("-",". ")} 지출 합계</span><b>${fmt(expTotal)}</b></div>
+      ${expRows}
+    </div>
+  </div>`;
+}
+async function addMenu(){
+  const name=$("nmName").value.trim(), en=$("nmEn").value.trim(), price=Number($("nmPrice").value), cat=$("nmCat").value;
+  if(!name||!price){toast("메뉴명과 가격을 입력하세요");return;}
+  const id="u"+Date.now();
+  const sort=(cat==="SINGLE"?200:50)+ (state.menusAll.filter(m=>m.category===cat).length);
+  const { error } = await sb.from("menus").insert({id,name,name_en:en||null,price,category:cat,sort,active:true});
+  if(error){toast("추가 실패: "+error.message);return;}
+  state.menusAll.push({id,name,name_en:en,price,category:cat,sort,active:true});
+  state.menus=state.menusAll.filter(x=>x.active!==false);
+  toast("메뉴가 추가되었습니다"); screenManage();
+}
+async function delMenu(id,name){
+  if(!confirm(`'${name}' 메뉴를 삭제할까요?\n(과거 매출 기록은 보존되고 마감 화면에서만 사라집니다)`))return;
+  const { error } = await sb.from("menus").update({active:false}).eq("id",id);
+  if(error){toast("삭제 실패: "+error.message);return;}
+  const m=menuById(id); if(m)m.active=false;
+  state.menus=state.menusAll.filter(x=>x.active!==false);
+  toast("메뉴가 삭제되었습니다"); screenManage();
+}
+async function addExpense(bId){
+  const date=$("exDate").value, category=$("exCat").value, amount=Number($("exAmt").value);
+  if(!date||!amount){toast("날짜와 금액을 입력하세요");return;}
+  const { error } = await sb.from("expenses").insert({branch_id:bId,date,category,amount});
+  if(error){toast("저장 실패: "+error.message);return;}
+  toast("지출이 등록되었습니다"); screenManage();
+}
+async function delExpense(id){
+  const { error } = await sb.from("expenses").delete().eq("id",id);
+  if(error){toast("삭제 실패: "+error.message);return;}
+  screenManage();
 }
 
 init();
