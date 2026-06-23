@@ -240,6 +240,37 @@ const I18N = {
   status_SHIPPING:{ko:"배송중",en:"Shipping",tl:"Pinapadala"},
   status_DELIVERED:{ko:"배송완료",en:"Delivered",tl:"Naihatid"},
 };
+// ── 밀키트 품목 영어/따갈로그 (호점 주문 화면 전용) ──
+const KIT_I18N = {
+  k1:{en:"Pork Cutlet Meal Kit"}, k2:{en:"Spicy Pork (Jeyuk) Meal Kit"}, k3:{en:"Kimchi Stew Base"},
+  k4:{en:"Buldak Cheese"}, k5:{en:"Buldak Rosé"}, k6:{en:"Buldak Stew"},
+  k7:{en:"Jin Ramen (Mild/Spicy)"}, k8:{en:"Shin Ramen"}, k9:{en:"Chapagetti"},
+  k10:{en:"Pork Cutlet (1 serving)"}, k11:{en:"Sweet & Sour Pork (1 serving)"}, k12:{en:"Chicken (1 serving)",tl:"Manok"},
+  k13:{en:"Kimchi (1kg)"}, k14:{en:"Stir-fried Kimchi (1kg)"}, k15:{en:"Pork Belly (200g)",tl:"Liempo"},
+  k16:{en:"Gimbap Seaweed (100 sheets)"}, k17:{en:"Pickled Radish for Gimbap (1kg)"}, k18:{en:"Tteokbokki Rice Cake (1kg)"},
+  k19:{en:"Fish Cake (1kg)"}, k20:{en:"Sesame Salt (1 bottle)"}, k21:{en:"Soybean/Chili Paste (1kg)"},
+  k22:{en:"Ssamjang Dipping Paste (1kg)"}, k23:{en:"Sesame Oil (1 bottle)"}, k24:{en:"Cheese (1 slice)",tl:"Keso"},
+  k25:{en:"Dumplings (3 pcs)"}, k26:{en:"Spam (1 piece)"},
+  b1:{en:"Buldak Purchase"}, b2:{en:"Jin Ramen Purchase"}, b3:{en:"Other Ramen Purchase"},
+};
+const KIT_CATS = [
+  {key:"COSA", ko:"코사마트", en:"Cosa Mart"},
+  {key:"MARKET", ko:"시장주문", en:"Market Order"},
+  {key:"OTHER", ko:"이외 주문 물품", en:"Other Items"},
+];
+function kitName(k){ if(state.lang==="ko") return k.name; const e=KIT_I18N[k.id]; const en=k.name_en||e?.en; if(!en) return k.name; return en+(e?.tl?`<span class="lang-sub">${e.tl}</span>`:""); }
+function kitNameText(id){ const k=kitById(id); if(!k) return ""; if(state.lang==="ko") return k.name; return k.name_en||KIT_I18N[id]?.en||k.name; }
+function kitGroupsHTML(){
+  const known=new Set(KIT_CATS.map(c=>c.key));
+  let html=KIT_CATS.map(c=>{
+    const ks=state.kits.filter(k=>k.category===c.key);
+    if(!ks.length) return "";
+    return `<div class="section-label">${state.lang==="ko"?c.ko:c.en}</div>${ks.map(kitRowHTML).join("")}`;
+  }).join("");
+  const rest=state.kits.filter(k=>!known.has(k.category));
+  if(rest.length) html+=rest.map(kitRowHTML).join("");
+  return html||state.kits.map(kitRowHTML).join("");
+}
 function tt(k){ const e=I18N[k]; if(!e) return k; return state.lang==="ko" ? (e.ko??k) : (e.en??k); }
 function tl(k){ const e=I18N[k]; if(!e) return k; if(state.lang==="ko") return e.ko??k; return (e.en??k)+(e.tl?`<span class="lang-sub">${e.tl}</span>`:""); }
 function langButtons(){ return [["ko","한국어"],["en","English · Tagalog"]].map(([k,l])=>`<button class="${state.lang===k?'on':''}" onclick="setLang('${k}')">${l}</button>`).join(""); }
@@ -405,7 +436,7 @@ async function screenMyOrder(){
   const { data: orders } = await sb.from("kit_orders").select("*").eq("branch_id", b.branchId).order("id",{ascending:false});
   $("screen").innerHTML=`<div class="grid-2">
     <div class="card"><h2>${b.name} ${tl("order_title")}</h2>
-      <div id="kitRows">${state.kits.map(kitRowHTML).join("")}</div>
+      <div id="kitRows">${kitGroupsHTML()}</div>
       ${b.type==="FRANCHISE"?`<div class="mode-pick"><div class="section-label">${tl("pay_method")}</div>
         <label class="${orderDraft.mode==="NET"?"on":""}" onclick="setMode('NET')"><input type="radio" ${orderDraft.mode==="NET"?"checked":""}> ${tl("pay_net")}</label>
         <label class="${orderDraft.mode==="SEPARATE"?"on":""}" onclick="setMode('SEPARATE')"><input type="radio" ${orderDraft.mode==="SEPARATE"?"checked":""}> ${tl("pay_sep")}</label></div>`:""}
@@ -416,12 +447,12 @@ async function screenMyOrder(){
   recalcOrder();
 }
 function kitRowHTML(k){const q=orderDraft.qty[k.id]||0;return `<div class="menu-row">
-  <span class="m-name">${k.name}</span>
+  <span class="m-name">${kitName(k)}</span>
   <div class="stepper"><button onclick="stepKit('${k.id}',-1)">−</button>
   <input type="number" inputmode="numeric" id="k_${k.id}" value="${q||''}" placeholder="0" oninput="setKit('${k.id}',this.value)">
   <button onclick="stepKit('${k.id}',1)">+</button></div></div>`;}
 function orderCardHTML(o){return `<div class="order-card"><div class="order-top"><span class="muted">${o.date}</span><span class="status s-${o.status}">${tt("status_"+o.status)}</span></div>
-  <div class="order-items">${o.items.map(it=>`<span class="chip">${kitById(it.kitId)?.name||""} × ${it.qty}</span>`).join("")}</div></div>`;}
+  <div class="order-items">${o.items.map(it=>`<span class="chip">${kitNameText(it.kitId)} × ${it.qty}</span>`).join("")}</div></div>`;}
 function setKit(id,v){orderDraft.qty[id]=Number(v)||0;recalcOrder();}
 function stepKit(id,d){const q=Math.max(0,(orderDraft.qty[id]||0)+d);orderDraft.qty[id]=q;$("k_"+id).value=q||"";recalcOrder();}
 function setMode(m){orderDraft.mode=m;screenMyOrder();}
