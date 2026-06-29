@@ -341,7 +341,7 @@ function logout() { state.user = null; renderLogin(); }
 function renderApp() {
   const u = state.user, hq = u.branchId === 0;
   const tabs = hq
-    ? [["dashboard","지점 현황"],["settle","가맹점 정산"],["orders","밀키트 관리"],["daily","일별 매출"],["report","월별 보고서"],["manage","관리"]]
+    ? [["dashboard","지점 현황"],["settle","가맹점 정산"],["orders","밀키트 관리"],["daily","일별 매출"],["menurank","메뉴 순위"],["report","월별 보고서"],["manage","관리"]]
     : [["closing",tt("tab_closing")],["myorder",tt("tab_order")]];
   const role = hq ? "전체 관리" : (u.type==="DIRECT"?tt("direct_branch"):tt("franchise_branch"));
   $("root").innerHTML = `
@@ -363,6 +363,7 @@ async function renderScreen() {
   if (t === "settle") return screenSettle();
   if (t === "orders") return screenOrders();
   if (t === "daily") return screenDaily();
+  if (t === "menurank") return screenMenuRank();
   if (t === "report") return screenReport();
   if (t === "manage") return screenManage();
 }
@@ -608,6 +609,71 @@ function renderDaily(){
       <p class="hint" style="margin:0 0 10px">호점을 눌러 그래프에 추가/제외하세요. 여러 호점을 함께 선택해 비교할 수 있습니다.</p>
       <div class="legend multi" style="flex-wrap:wrap;gap:8px;margin-bottom:10px">${chips}</div>
       ${chart}
+    </div>`;
+}
+
+// ── 본사: 메뉴 판매 순위 (호점·월·일 필터) ────────
+async function fetchMenuRank(month,branchId,day){
+  const {start,end}=monthBounds(month);
+  let q=sb.from("closings").select("branch_id,date,items").gte("date",start).lt("date",end);
+  if(branchId!=="ALL") q=q.eq("branch_id",branchId);
+  const {data:cs}=await q;
+  let rows=cs||[];
+  if(day!=="ALL"){ const ds=`${month}-${day}`; rows=rows.filter(c=>String(c.date).slice(0,10)===ds); }
+  const rank={};
+  rows.forEach(c=>Object.entries(c.items||{}).filter(([id])=>!String(id).startsWith("_")).forEach(([id,v])=>{
+    const o=rank[id]||(rank[id]={q:0,rev:0}); o.q+=itemQty(v); o.rev+=itemRev(v,menuById(id));
+  }));
+  const ranked=Object.entries(rank).map(([id,o])=>({name:menuById(id)?.name||id,q:o.q,rev:o.rev})).sort((a,b)=>b.rev-a.rev||b.q-a.q);
+  const dayset=new Set(rows.map(c=>String(c.date).slice(0,10)));
+  return {ranked, days:dayset.size, totalQ:ranked.reduce((s,r)=>s+r.q,0), totalRev:ranked.reduce((s,r)=>s+r.rev,0)};
+}
+function setMr(part,val){
+  const m=state._mrMonth||thisMonth();
+  state._mrMonth = part==="y" ? val+"-"+m.slice(5) : m.slice(0,4)+"-"+val;
+  state._mrDay="ALL";
+  screenMenuRank();
+}
+async function screenMenuRank(){
+  const month=state._mrMonth||thisMonth();
+  const branchId=state._mrBranch||"ALL";
+  const day=state._mrDay||"ALL";
+  state._mrMonth=month; state._mrBranch=branchId; state._mrDay=day;
+  const bs=state.branches.filter(b=>b.id!==0);
+  const {ranked,days,totalQ,totalRev}=await fetchMenuRank(month,branchId,day);
+  const yNow=Number(month.slice(0,4)), dim=new Date(yNow,Number(month.slice(5)),0).getDate();
+  const years=[]; for(let y=yNow+1;y>=yNow-3;y--) years.push(y);
+  const branchOpts=`<option value="ALL" ${branchId==="ALL"?"selected":""}>전체 호점</option>`+bs.map(b=>`<option value="${b.id}" ${String(b.id)===String(branchId)?"selected":""}>${b.name}</option>`).join("");
+  const yearOpts=years.map(y=>`<option value="${y}" ${y===yNow?"selected":""}>${y}년</option>`).join("");
+  const monthOpts=Array.from({length:12},(_,i)=>i+1).map(mn=>{const mm=String(mn).padStart(2,"0");return `<option value="${mm}" ${mm===month.slice(5)?"selected":""}>${mn}월</option>`;}).join("");
+  const dayOpts=`<option value="ALL" ${day==="ALL"?"selected":""}>전체(월간)</option>`+Array.from({length:dim},(_,i)=>i+1).map(dn=>{const dd=String(dn).padStart(2,"0");return `<option value="${dd}" ${dd===day?"selected":""}>${dn}일</option>`;}).join("");
+  const selBranch=bs.find(b=>String(b.id)===String(branchId));
+  const scope=`${branchId==="ALL"?"전체 호점":(selBranch?.name||branchId)} · ${month.replace("-",". ")}${day==="ALL"?" (월간)":" "+Number(day)+"일"}`;
+  const maxRev=Math.max(...ranked.map(r=>r.rev),1);
+  const rows=ranked.map((r,i)=>`<tr>
+    <td style="color:#9A8E7E;width:34px">${i+1}</td>
+    <td>${r.name}</td>
+    <td class="num">${r.q}개</td>
+    <td class="num"><span class="minibar" style="width:${Math.max(4,(r.rev/maxRev)*70)}px"></span>${fmt(r.rev)}</td></tr>`).join("");
+  $("screen").innerHTML=`
+    <div class="filter-bar">
+      <select onchange="state._mrBranch=this.value;screenMenuRank()">${branchOpts}</select>
+      <select onchange="setMr('y',this.value)">${yearOpts}</select>
+      <select onchange="setMr('m',this.value)">${monthOpts}</select>
+      <select onchange="state._mrDay=this.value;screenMenuRank()">${dayOpts}</select>
+    </div>
+    <div class="report-title">메뉴 판매 순위 <span>· ${scope}</span></div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-label">총 판매 수량</div><div class="kpi-value">${totalQ}개</div></div>
+      <div class="kpi"><div class="kpi-label">총 메뉴 매출</div><div class="kpi-value">${fmt(totalRev)}</div></div>
+      <div class="kpi"><div class="kpi-label">집계 마감일수</div><div class="kpi-value">${days}일</div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>메뉴별 순위</h2><span class="muted">매출순 정렬</span></div>
+      <table class="data-table">
+        <thead><tr><th>#</th><th>메뉴</th><th class="num">판매</th><th class="num">매출</th></tr></thead>
+        <tbody>${rows||`<tr><td colspan="4" class="empty">선택한 조건에 판매 데이터가 없습니다.</td></tr>`}</tbody>
+      </table>
     </div>`;
 }
 
