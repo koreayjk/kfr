@@ -341,7 +341,7 @@ function logout() { state.user = null; renderLogin(); }
 function renderApp() {
   const u = state.user, hq = u.branchId === 0;
   const tabs = hq
-    ? [["dashboard","지점 현황"],["settle","가맹점 정산"],["orders","밀키트 관리"],["report","월별 보고서"],["manage","관리"]]
+    ? [["dashboard","지점 현황"],["settle","가맹점 정산"],["orders","밀키트 관리"],["daily","일별 매출"],["report","월별 보고서"],["manage","관리"]]
     : [["closing",tt("tab_closing")],["myorder",tt("tab_order")]];
   const role = hq ? "전체 관리" : (u.type==="DIRECT"?tt("direct_branch"):tt("franchise_branch"));
   $("root").innerHTML = `
@@ -362,6 +362,7 @@ async function renderScreen() {
   if (t === "dashboard") return screenDashboard();
   if (t === "settle") return screenSettle();
   if (t === "orders") return screenOrders();
+  if (t === "daily") return screenDaily();
   if (t === "report") return screenReport();
   if (t === "manage") return screenManage();
 }
@@ -498,6 +499,62 @@ async function screenDashboard(){
       <div class="card"><h2>메뉴 판매 순위</h2><table class="data-table"><thead><tr><th>메뉴</th><th>판매</th><th>매출</th></tr></thead><tbody>
         ${ranked.length?ranked.map(m=>`<tr><td>${m.name}</td><td>${m.q}개</td><td>${fmt(m.rev)}</td></tr>`).join(""):'<tr><td colspan="3" class="empty">아직 마감 데이터가 없습니다</td></tr>'}
       </tbody></table></div>
+    </div>`;
+}
+
+// ── 본사: 일별 매출 ──────────────────────────────
+const WEEKDAY_KO=["일","월","화","수","목","금","토"];
+function weekdayKo(dateStr){ return WEEKDAY_KO[new Date(dateStr+"T00:00:00").getDay()]; }
+async function fetchDaily(month){
+  const {start,end}=monthBounds(month);
+  const {data:cs}=await sb.from("closings").select("branch_id,date,cash,gcash").gte("date",start).lt("date",end).order("date");
+  const byDate={};
+  (cs||[]).forEach(c=>{
+    const d=String(c.date).slice(0,10);
+    (byDate[d]||(byDate[d]={}));
+    byDate[d][c.branch_id]=(byDate[d][c.branch_id]||0)+Number(c.cash)+Number(c.gcash);
+  });
+  return {dates:Object.keys(byDate).sort(), byDate};
+}
+async function screenDaily(){
+  const month=state._dailyMonth||thisMonth();
+  state._dailyMonth=month;
+  const bs=state.branches.filter(b=>b.id!==0);
+  const {dates,byDate}=await fetchDaily(month);
+  const branchTot={}; bs.forEach(b=>branchTot[b.id]=0);
+  let grand=0;
+  const rows=dates.map(d=>{
+    let dayTot=0;
+    const cells=bs.map(b=>{
+      const v=byDate[d][b.id]||0; branchTot[b.id]+=v; dayTot+=v;
+      return v?`<td class="num">${fmt(v)}</td>`:`<td class="num" style="color:#C9BFAE">–</td>`;
+    }).join("");
+    grand+=dayTot;
+    const wd=weekdayKo(d), wc=wd==="일"?"#B5322E":wd==="토"?"#3A5A82":"#9A8E7E";
+    return `<tr><td style="white-space:nowrap"><b>${Number(d.slice(8,10))}일</b> <span style="color:${wc};font-weight:600">(${wd})</span></td>${cells}<td class="num"><b>${fmt(dayTot)}</b></td></tr>`;
+  }).join("");
+  const footTot=bs.map(b=>`<td class="num"><b>${fmt(branchTot[b.id])}</b></td>`).join("");
+  const head=bs.map(b=>`<th class="num">${b.name}</th>`).join("");
+  const dayCount=dates.length, avg=dayCount?grand/dayCount:0;
+  $("screen").innerHTML=`
+    <div class="filter-bar">
+      <input type="month" value="${month}" onchange="state._dailyMonth=this.value;screenDaily()">
+    </div>
+    <div class="report-title">일별 매출 <span>· ${month.replace("-",". ")} · 각 호점 일 매출(현금+GCash)</span></div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-label">이번 달 전 지점 합계</div><div class="kpi-value">${fmt(grand)}</div></div>
+      <div class="kpi"><div class="kpi-label">마감 일수</div><div class="kpi-value">${dayCount}일</div></div>
+      <div class="kpi"><div class="kpi-label">일 평균 (전 지점)</div><div class="kpi-value">${fmt(Math.round(avg))}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>날짜별 호점 매출</h2><span class="muted">빈칸(–)은 마감 입력이 없는 날</span></div>
+      <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead><tr><th>날짜</th>${head}<th class="num">일 합계</th></tr></thead>
+        <tbody>${rows||`<tr><td colspan="${bs.length+2}" class="empty">이 달에는 마감 데이터가 없습니다.</td></tr>`}</tbody>
+        ${dates.length?`<tfoot><tr style="border-top:2px solid #E6DFD4"><td><b>합계</b></td>${footTot}<td class="num"><b>${fmt(grand)}</b></td></tr></tfoot>`:""}
+      </table>
+      </div>
     </div>`;
 }
 
