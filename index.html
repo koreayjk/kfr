@@ -368,7 +368,7 @@ async function renderScreen() {
 }
 
 // ── 마감 입력 ───────────────────────────────────
-const closingDraft = { qty:{}, promo:{}, cash:"", gcash:"" };
+const closingDraft = { qty:{}, promo:{}, cash:"", gcash:"", deduct:"" };
 const CAT_LABEL = { GENERAL:"일반 메뉴", SINGLE:"단품 메뉴" };
 function unitPrice(m){ const p=Number(closingDraft.promo[m.id]); return p>0?p:m.price; }
 async function screenClosing() {
@@ -386,6 +386,11 @@ async function screenClosing() {
       <div class="card-head"><h2>${b.name} ${tl("closing_title")}</h2><span class="date-pill">${today()}</span></div>
       <div class="menu-head"><span>${tt("h_menu")}</span><span>${tt("h_price")}</span><span>${tt("h_qty")}</span><span>${tt("h_promo")}</span><span>${tt("h_sub")}</span></div>
       ${menuHtml}
+      <div class="section-label">주문차감</div>
+      <div class="menu-row" style="grid-template-columns:1fr auto;align-items:center">
+        <span class="m-name">주문차감<em class="m-en">Order Deduction</em></span>
+        <div class="peso-field" style="width:150px"><span>${PESO}</span><input id="deduct" type="number" inputmode="numeric" placeholder="0" value="${d.deduct}" oninput="onDeduct()" style="text-align:right"></div>
+      </div>
     </div>
     <div class="card sticky">
       <h2>${tl("income_verify")}</h2>
@@ -393,6 +398,7 @@ async function screenClosing() {
       <div class="pay-input"><label>${tl("gcash")}</label><div class="peso-field"><span>${PESO}</span><input id="gcash" type="number" inputmode="numeric" placeholder="0" value="${d.gcash}" oninput="onPay()"></div></div>
       <div class="reconcile">
         <div class="rec-row"><span>${tt("menu_total")}</span><b id="menuTotal">${PESO}0</b></div>
+        <div class="rec-row" id="deductRow" style="display:none"><span>주문차감</span><b id="deductVal">−${PESO}0</b></div>
         <div class="rec-row"><span>${tt("recv_total")}</span><b id="recvTotal">${PESO}0</b></div>
         <div class="rec-flag idle" id="flag">${tt("flag_idle")}</div>
       </div>
@@ -413,11 +419,15 @@ function setQty(id,v){closingDraft.qty[id]=Number(v)||0; const m=menuById(id); $
 function stepQty(id,delta){const q=Math.max(0,(closingDraft.qty[id]||0)+delta);closingDraft.qty[id]=q;$("q_"+id).value=q||"";const m=menuById(id);$("sub_"+id).textContent=q>0?fmt(q*unitPrice(m)):"—";recalc();}
 function setPromo(id,v){closingDraft.promo[id]=v; const m=menuById(id),q=closingDraft.qty[id]||0; $("sub_"+id).textContent=q>0?fmt(q*unitPrice(m)):"—"; recalc();}
 function onPay(){closingDraft.cash=$("cash").value;closingDraft.gcash=$("gcash").value;recalc();}
+function onDeduct(){closingDraft.deduct=$("deduct").value;recalc();}
 function recalc(){
   const menuTotal=state.menus.reduce((s,m)=>s+(closingDraft.qty[m.id]||0)*unitPrice(m),0);
+  const deduct=Number(closingDraft.deduct)||0;
+  const target=menuTotal-deduct;
   const recv=(Number(closingDraft.cash)||0)+(Number(closingDraft.gcash)||0);
-  const diff=recv-menuTotal, has=menuTotal>0;
+  const diff=recv-target, has=menuTotal>0||deduct>0;
   $("menuTotal").textContent=fmt(menuTotal); $("recvTotal").textContent=fmt(recv);
+  const dr=$("deductRow"); if(dr){ if(deduct>0){dr.style.display="";$("deductVal").textContent="−"+fmt(deduct);} else dr.style.display="none"; }
   const f=$("flag");
   if(!has){f.className="rec-flag idle";f.textContent=tt("flag_idle");}
   else if(diff===0){f.className="rec-flag ok";f.textContent=tt("flag_ok");}
@@ -427,11 +437,12 @@ function recalc(){
 async function saveClosing(){
   const items={};
   state.menus.forEach(m=>{ const q=closingDraft.qty[m.id]||0; if(q>0){ const pr=Number(closingDraft.promo[m.id]); items[m.id]= pr>0 ? {q, p:pr} : q; }});
+  const deduct=Number(closingDraft.deduct)||0; if(deduct>0) items._deduct=deduct;
   $("saveBtn").disabled=true;
   const { error } = await sb.from("closings").insert({ branch_id: state.user.branchId, date: today(), items, cash: Number(closingDraft.cash)||0, gcash: Number(closingDraft.gcash)||0 });
   if(error){toast(tt("save_fail")+error.message);$("saveBtn").disabled=false;return;}
   toast(tt("saved_closing"));
-  closingDraft.qty={};closingDraft.promo={};closingDraft.cash="";closingDraft.gcash="";
+  closingDraft.qty={};closingDraft.promo={};closingDraft.cash="";closingDraft.gcash="";closingDraft.deduct="";
   screenClosing();
 }
 
@@ -483,7 +494,7 @@ async function screenDashboard(){
   });
   const grand=per.reduce((s,b)=>s+b.total,0), gcashTotal=per.reduce((s,b)=>s+b.gcash,0);
   const maxT=Math.max(...per.map(b=>b.total),1);
-  const rank={}; cs.forEach(c=>Object.entries(c.items).forEach(([id,v])=>{const o=rank[id]||(rank[id]={q:0,rev:0}); o.q+=itemQty(v); o.rev+=itemRev(v,menuById(id));}));
+  const rank={}; cs.forEach(c=>Object.entries(c.items).filter(([id])=>!String(id).startsWith("_")).forEach(([id,v])=>{const o=rank[id]||(rank[id]={q:0,rev:0}); o.q+=itemQty(v); o.rev+=itemRev(v,menuById(id));}));
   const ranked=Object.entries(rank).map(([id,o])=>({name:menuById(id)?.name||id,q:o.q,rev:o.rev})).sort((a,b)=>b.rev-a.rev);
   $("screen").innerHTML=`
     <div class="kpi-row">
@@ -519,8 +530,27 @@ async function fetchDaily(month){
 async function screenDaily(){
   const month=state._dailyMonth||thisMonth();
   state._dailyMonth=month;
-  const bs=state.branches.filter(b=>b.id!==0);
   const {dates,byDate}=await fetchDaily(month);
+  state._dailyCache={month,dates,byDate};
+  renderDaily();
+}
+function setDailyMonth(part,val){
+  const m=state._dailyMonth||thisMonth();
+  state._dailyMonth = part==="y" ? val+"-"+m.slice(5) : m.slice(0,4)+"-"+val;
+  screenDaily();
+}
+function toggleDailyBranch(id){
+  id=String(id);
+  if(!state._dailySel) state._dailySel=new Set();
+  if(state._dailySel.has(id)) state._dailySel.delete(id); else state._dailySel.add(id);
+  renderDaily();
+}
+function renderDaily(){
+  const {month,dates,byDate}=state._dailyCache;
+  const bs=state.branches.filter(b=>b.id!==0);
+  if(!state._dailySel) state._dailySel=new Set(bs.map(b=>String(b.id)));
+  const sel=state._dailySel;
+  // ── 날짜 × 호점 표 ──
   const branchTot={}; bs.forEach(b=>branchTot[b.id]=0);
   let grand=0;
   const rows=dates.map(d=>{
@@ -536,9 +566,26 @@ async function screenDaily(){
   const footTot=bs.map(b=>`<td class="num"><b>${fmt(branchTot[b.id])}</b></td>`).join("");
   const head=bs.map(b=>`<th class="num">${b.name}</th>`).join("");
   const dayCount=dates.length, avg=dayCount?grand/dayCount:0;
+  // ── 년/월 선택 드롭다운 ──
+  const yNow=Number(month.slice(0,4));
+  const years=[]; for(let y=yNow+1;y>=yNow-3;y--) years.push(y);
+  const yearOpts=years.map(y=>`<option value="${y}" ${y===yNow?"selected":""}>${y}년</option>`).join("");
+  const monthOpts=Array.from({length:12},(_,i)=>i+1).map(mn=>{const mm=String(mn).padStart(2,"0");return `<option value="${mm}" ${mm===month.slice(5)?"selected":""}>${mn}월</option>`;}).join("");
+  // ── 호점별 일 매출 꺾은선 (선택 호점 비교) ──
+  const dim=new Date(yNow,Number(month.slice(5)),0).getDate();
+  const days=Array.from({length:dim},(_,i)=>i+1);
+  const labels=days.map(dn=>(dn===1||dn%5===0)?String(dn):"");
+  const series=bs.map((b,i)=>({b,i})).filter(({b})=>sel.has(String(b.id))).map(({b,i})=>({
+    name:b.name, color:PALETTE[i%PALETTE.length],
+    values:days.map(dn=>{const d=`${month}-${String(dn).padStart(2,"0")}`; return (byDate[d]&&byDate[d][b.id])||0;})
+  }));
+  const chips=bs.map((b,i)=>{const on=sel.has(String(b.id)),c=PALETTE[i%PALETTE.length];
+    return `<button class="chip" onclick="toggleDailyBranch('${b.id}')" style="cursor:pointer;border:1.5px solid ${on?c:'#D8CDBD'};background:${on?c+'1A':'#fff'};color:${on?c:'#9A8E7E'}">${b.name}</button>`;}).join("");
+  const chart = series.length ? svgTrend(labels, series) : `<p class="empty">비교할 호점을 선택하세요.</p>`;
   $("screen").innerHTML=`
     <div class="filter-bar">
-      <input type="month" value="${month}" onchange="state._dailyMonth=this.value;screenDaily()">
+      <select onchange="setDailyMonth('y',this.value)">${yearOpts}</select>
+      <select onchange="setDailyMonth('m',this.value)">${monthOpts}</select>
     </div>
     <div class="report-title">일별 매출 <span>· ${month.replace("-",". ")} · 각 호점 일 매출(현금+GCash)</span></div>
     <div class="kpi-row">
@@ -555,6 +602,12 @@ async function screenDaily(){
         ${dates.length?`<tfoot><tr style="border-top:2px solid #E6DFD4"><td><b>합계</b></td>${footTot}<td class="num"><b>${fmt(grand)}</b></td></tr></tfoot>`:""}
       </table>
       </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>호점별 일 매출 추이 <span class="muted">· 1일~${dim}일</span></h2></div>
+      <p class="hint" style="margin:0 0 10px">호점을 눌러 그래프에 추가/제외하세요. 여러 호점을 함께 선택해 비교할 수 있습니다.</p>
+      <div class="legend multi" style="flex-wrap:wrap;gap:8px;margin-bottom:10px">${chips}</div>
+      ${chart}
     </div>`;
 }
 
