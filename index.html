@@ -510,8 +510,14 @@ async function submitOrder(){
 }
 
 // ── 본사: 지점 현황 ──────────────────────────────
+function fiscalYearBounds(dateStr){
+  const [y,m]=dateStr.split("-").map(Number);
+  const sy = m>=7 ? y : y-1;            // 회계연도: 7월 시작 ~ 다음해 6월 종료
+  return { start:`${sy}-07-01`, end:`${sy+1}-07-01`, label:`${sy}.07 ~ ${sy+1}.06` };
+}
 async function screenDashboard(){
-  const { data: closings } = await sb.from("closings").select("*");
+  const fy=fiscalYearBounds(today());
+  const { data: closings } = await sb.from("closings").select("*").gte("date",fy.start).lt("date",fy.end);
   const cs = closings||[];
   const per = state.branches.filter(b=>b.id!==0).map(b=>{
     const my=cs.filter(c=>c.branch_id===b.id);
@@ -523,6 +529,7 @@ async function screenDashboard(){
   const rank={}; cs.forEach(c=>Object.entries(c.items).filter(([id])=>!String(id).startsWith("_")).forEach(([id,v])=>{const o=rank[id]||(rank[id]={q:0,rev:0}); o.q+=itemQty(v); o.rev+=itemRev(v,menuById(id));}));
   const ranked=Object.entries(rank).map(([id,o])=>({name:menuById(id)?.name||id,q:o.q,rev:o.rev})).sort((a,b)=>b.rev-a.rev);
   $("screen").innerHTML=`
+    <div class="report-title">지점 현황 <span>· 회계연도 ${fy.label} (7월~다음해 6월 누적)</span></div>
     <div class="kpi-row">
       <div class="kpi"><div class="kpi-label">전 지점 매출</div><div class="kpi-value">${fmt(grand)}</div></div>
       <div class="kpi accent"><div class="kpi-label">GCash 수입 (본사 계좌)</div><div class="kpi-value">${fmt(gcashTotal)}</div></div>
