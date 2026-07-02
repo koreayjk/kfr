@@ -369,12 +369,13 @@ async function renderScreen() {
 }
 
 // ── 마감 입력 ───────────────────────────────────
-const closingDraft = { qty:{}, promo:{}, cash:"", gcash:"", deduct:"" };
+const closingDraft = { qty:{}, promo:{}, cash:"", gcash:"", deduct:"", date:"", editId:null };
 const CAT_LABEL = { GENERAL:"일반 메뉴", SINGLE:"단품 메뉴" };
 function unitPrice(m){ const p=Number(closingDraft.promo[m.id]); return p>0?p:m.price; }
 async function screenClosing() {
   const b = state.user;
-  const { data: prev } = await sb.from("closings").select("date,cash,gcash").eq("branch_id", b.branchId).order("date",{ascending:false}).limit(3);
+  if(!closingDraft.date) closingDraft.date=today();
+  const { data: prev } = await sb.from("closings").select("date,cash,gcash").eq("branch_id", b.branchId).order("date",{ascending:false}).limit(7);
   const d = closingDraft;
   const cats=["GENERAL","SINGLE"];
   const menuHtml=cats.map(cat=>{
@@ -384,7 +385,10 @@ async function screenClosing() {
   }).join("");
   $("screen").innerHTML = `<div class="grid-2">
     <div class="card">
-      <div class="card-head"><h2>${b.name} ${tl("closing_title")}</h2><span class="date-pill">${today()}</span></div>
+      <div class="card-head"><h2>${b.name} ${tl("closing_title")}</h2>
+        <input class="date-pill" type="date" id="clDate" max="${today()}" value="${d.date}" onchange="loadClosingDate(this.value)" style="border:1px solid #D8CDBD;cursor:pointer">
+      </div>
+      ${d.editId?`<div class="setup-note" style="margin-bottom:12px">${state.lang==="ko"?`✏️ <b>${d.date}</b> 에 저장된 마감을 <b>수정</b> 중입니다. 저장하면 기존 기록이 갱신됩니다.`:`✏️ Editing the closing already saved for <b>${d.date}</b>. Saving updates that record.`}</div>`:(d.date!==today()?`<div class="setup-note" style="margin-bottom:12px">${state.lang==="ko"?`📅 <b>${d.date}</b> (지난 날짜) 마감을 새로 입력합니다.`:`📅 Entering a closing for <b>${d.date}</b> (past date).`}</div>`:"")}
       <div class="menu-head"><span>${tt("h_menu")}</span><span>${tt("h_price")}</span><span>${tt("h_qty")}</span><span>${tt("h_promo")}</span><span>${tt("h_sub")}</span></div>
       ${menuHtml}
       <div class="section-label">주문차감</div>
@@ -403,9 +407,9 @@ async function screenClosing() {
         <div class="rec-row"><span>${tt("recv_total")}</span><b id="recvTotal">${PESO}0</b></div>
         <div class="rec-flag idle" id="flag">${tt("flag_idle")}</div>
       </div>
-      <button class="btn-primary" id="saveBtn" disabled onclick="saveClosing()">${tl("save_closing")}</button>
+      <button class="btn-primary" id="saveBtn" disabled onclick="saveClosing()">${d.editId?(state.lang==="ko"?"수정 저장":"Update"):tl("save_closing")}</button>
       <p class="hint">${tt("closing_hint")}</p>
-      ${prev&&prev.length?`<div class="section-label">${tl("prev_closing")}</div>${prev.map(p=>`<div class="prev-row"><span>${p.date}</span><b>${fmt(p.cash+p.gcash)}</b></div>`).join("")}`:""}
+      ${prev&&prev.length?`<div class="section-label">${tl("prev_closing")}</div>${prev.map(p=>{const pd=String(p.date).slice(0,10);return `<div class="prev-row" style="cursor:pointer${pd===d.date?';background:#FBF1F0;border-radius:8px':''}" onclick="loadClosingDate('${pd}')"><span>${p.date}</span><b>${fmt(p.cash+p.gcash)}</b></div>`;}).join("")}<p class="hint">${state.lang==="ko"?"날짜를 누르면 그날 마감을 불러와 수정합니다.":"Tap a date to load & edit that day."}</p>`:""}
     </div></div>`;
   recalc();
 }
@@ -435,16 +439,37 @@ function recalc(){
   else{f.className="rec-flag bad";f.textContent=state.lang==="ko"?`차액 ${diff>0?"+":""}${fmt(diff)} — 확인 필요`:`Diff ${diff>0?"+":""}${fmt(diff)} — please check / pakisuri`;}
   $("saveBtn").disabled=!has;
 }
+async function loadClosingDate(date){
+  closingDraft.date=date;
+  const { data } = await sb.from("closings").select("id,items,cash,gcash").eq("branch_id",state.user.branchId).eq("date",date).order("id",{ascending:false}).limit(1);
+  const rec = data && data[0];
+  closingDraft.qty={};closingDraft.promo={};closingDraft.deduct="";closingDraft.cash="";closingDraft.gcash="";closingDraft.editId=null;
+  if(rec){
+    closingDraft.editId=rec.id;
+    closingDraft.cash=rec.cash??"";
+    closingDraft.gcash=rec.gcash??"";
+    Object.entries(rec.items||{}).forEach(([id,v])=>{
+      if(id==="_deduct"){ closingDraft.deduct=v; return; }
+      if(String(id).startsWith("_")) return;
+      if(v && typeof v==="object"){ closingDraft.qty[id]=Number(v.q||0); if(v.p) closingDraft.promo[id]=v.p; }
+      else closingDraft.qty[id]=Number(v||0);
+    });
+  }
+  screenClosing();
+}
 async function saveClosing(){
   const items={};
   state.menus.forEach(m=>{ const q=closingDraft.qty[m.id]||0; if(q>0){ const pr=Number(closingDraft.promo[m.id]); items[m.id]= pr>0 ? {q, p:pr} : q; }});
   const deduct=Number(closingDraft.deduct)||0; if(deduct>0) items._deduct=deduct;
   $("saveBtn").disabled=true;
-  const { error } = await sb.from("closings").insert({ branch_id: state.user.branchId, date: today(), items, cash: Number(closingDraft.cash)||0, gcash: Number(closingDraft.gcash)||0 });
+  const date=closingDraft.date||today();
+  const payload={ branch_id: state.user.branchId, date, items, cash: Number(closingDraft.cash)||0, gcash: Number(closingDraft.gcash)||0 };
+  const { error } = closingDraft.editId
+    ? await sb.from("closings").update(payload).eq("id",closingDraft.editId)
+    : await sb.from("closings").insert(payload);
   if(error){toast(tt("save_fail")+error.message);$("saveBtn").disabled=false;return;}
-  toast(tt("saved_closing"));
-  closingDraft.qty={};closingDraft.promo={};closingDraft.cash="";closingDraft.gcash="";closingDraft.deduct="";
-  screenClosing();
+  toast(closingDraft.editId?(state.lang==="ko"?"마감이 수정되었습니다":"Closing updated"):tt("saved_closing"));
+  loadClosingDate(date);
 }
 
 // ── 밀키트 주문 (호점) ───────────────────────────
