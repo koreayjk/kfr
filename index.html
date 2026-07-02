@@ -369,11 +369,12 @@ async function renderScreen() {
 }
 
 // ── 마감 입력 ───────────────────────────────────
-const closingDraft = { qty:{}, promo:{}, cash:"", gcash:"", deduct:"", date:"", editId:null };
+const closingDraft = { qty:{}, promo:{}, cash:"", gcash:"", deduct:"", date:"", editId:null, branchId:null, admin:false };
 const CAT_LABEL = { GENERAL:"일반 메뉴", SINGLE:"단품 메뉴" };
 function unitPrice(m){ const p=Number(closingDraft.promo[m.id]); return p>0?p:m.price; }
 async function screenClosing() {
   const b = state.user;
+  closingDraft.admin=false; closingDraft.branchId=b.branchId;
   if(!closingDraft.date) closingDraft.date=today();
   const { data: prev } = await sb.from("closings").select("date,cash,gcash").eq("branch_id", b.branchId).order("date",{ascending:false}).limit(7);
   const d = closingDraft;
@@ -437,7 +438,7 @@ function recalc(){
   if(!has){f.className="rec-flag idle";f.textContent=tt("flag_idle");}
   else if(diff===0){f.className="rec-flag ok";f.textContent=tt("flag_ok");}
   else{f.className="rec-flag bad";f.textContent=state.lang==="ko"?`차액 ${diff>0?"+":""}${fmt(diff)} — 확인 필요`:`Diff ${diff>0?"+":""}${fmt(diff)} — please check / pakisuri`;}
-  $("saveBtn").disabled=!has;
+  $("saveBtn").disabled = closingDraft.admin ? !(has || recv>0) : !has;
 }
 async function loadClosingDate(date){
   closingDraft.date=date;
@@ -590,7 +591,7 @@ function renderDaily(){
     let dayTot=0;
     const cells=bs.map(b=>{
       const v=byDate[d][b.id]||0; branchTot[b.id]+=v; dayTot+=v;
-      return `<td class="num" style="cursor:pointer${v?"":";color:#C9BFAE"}" onclick="adminPickCell('${b.id}','${d}')" title="클릭하면 정정/추가">${v?fmt(v):"–"}</td>`;
+      return `<td class="num" style="cursor:pointer${v?"":";color:#C9BFAE"}" onclick="adminEditClosing('${b.id}','${d}')" title="클릭하면 메뉴 수량까지 수정">${v?fmt(v):"–"}</td>`;
     }).join("");
     grand+=dayTot;
     const wd=weekdayKo(d), wc=wd==="일"?"#B5322E":wd==="토"?"#3A5A82":"#9A8E7E";
@@ -627,17 +628,13 @@ function renderDaily(){
       <div class="kpi"><div class="kpi-label">일 평균 (전 지점)</div><div class="kpi-value">${fmt(Math.round(avg))}</div></div>
     </div>
     <div class="card">
-      <div class="card-head"><h2>매출 정정 · 추가 · 삭제 <span class="muted">(관리자)</span></h2></div>
+      <div class="card-head"><h2>매출 정정 · 추가 <span class="muted">(관리자)</span></h2></div>
       <div class="add-form">
         <select id="adBranch">${bs.map(b=>`<option value="${b.id}">${b.name}</option>`).join("")}</select>
         <input id="adDate" type="date" value="${today()}" max="${today()}">
-        <div class="peso-field" style="width:130px"><span>${PESO}</span><input id="adCash" type="number" inputmode="numeric" placeholder="현금"></div>
-        <div class="peso-field" style="width:130px"><span>${PESO}</span><input id="adGcash" type="number" inputmode="numeric" placeholder="GCash"></div>
-        <button class="btn-mini" onclick="adminLoadClosing()">불러오기</button>
-        <button class="btn-mini" onclick="adminSaveClosing()">저장</button>
-        <button class="mng-del" onclick="adminDeleteClosing()">삭제</button>
+        <button class="btn-mini" onclick="adminEditFromControls()">이 날짜 편집 / 추가</button>
       </div>
-      <p class="hint">아래 표의 금액 칸을 클릭하면 그 호점·날짜가 자동으로 채워집니다. 저장된 매출이 있으면 <b>정정</b>, 없으면 <b>추가</b>됩니다. (현금·GCash 금액 조정 — 메뉴 수량 수정은 호점 마감 화면에서)</p>
+      <p class="hint">아래 표의 금액 칸을 클릭하면 그 호점·날짜의 매출을 <b>메뉴 수량까지</b> 수정할 수 있습니다. 저장된 게 없으면 새로 추가됩니다.</p>
     </div>
     <div class="card">
       <div class="card-head"><h2>날짜별 호점 매출</h2><span class="muted">빈칸(–)은 마감 입력이 없는 날</span></div>
@@ -658,38 +655,80 @@ function renderDaily(){
 }
 
 function adminBranchKey(bId){ const o=state.branches.find(x=>String(x.id)===String(bId)); return o?o.id:bId; }
-function adminPickCell(bId,date){
-  const s=$("adBranch"); if(s) s.value=bId;
-  const dt=$("adDate"); if(dt) dt.value=date;
-  adminLoadClosing();
-}
-async function adminLoadClosing(){
-  const key=adminBranchKey($("adBranch").value), date=$("adDate").value;
+function branchNameOf(id){ const b=state.branches.find(x=>String(x.id)===String(id)); return b?b.name:id; }
+function adminEditFromControls(){
+  const date=$("adDate").value;
   if(!date){toast("날짜를 선택하세요");return;}
-  const { data }=await sb.from("closings").select("id,cash,gcash").eq("branch_id",key).eq("date",date).order("id",{ascending:false}).limit(1);
-  const rec=data&&data[0];
-  $("adCash").value = rec ? (rec.cash??0) : "";
-  $("adGcash").value = rec ? (rec.gcash??0) : "";
-  toast(rec?`${date} 매출 불러옴 — 정정 가능`:`${date} 저장된 매출 없음 — 추가 입력`);
+  adminEditClosing($("adBranch").value, date);
 }
-async function adminSaveClosing(){
-  const key=adminBranchKey($("adBranch").value), date=$("adDate").value;
-  if(!date){toast("날짜를 선택하세요");return;}
-  const cash=Number($("adCash").value)||0, gcash=Number($("adGcash").value)||0;
-  const { data }=await sb.from("closings").select("id").eq("branch_id",key).eq("date",date).order("id",{ascending:false}).limit(1);
+async function adminEditClosing(branchId, date){
+  closingDraft.admin=true;
+  closingDraft.branchId=adminBranchKey(branchId);
+  closingDraft.date=date;
+  const { data }=await sb.from("closings").select("id,items,cash,gcash").eq("branch_id",closingDraft.branchId).eq("date",date).order("id",{ascending:false}).limit(1);
   const rec=data&&data[0];
-  let error;
-  if(rec){ ({ error }=await sb.from("closings").update({cash,gcash}).eq("id",rec.id)); }
-  else { ({ error }=await sb.from("closings").insert({branch_id:key,date,items:{},cash,gcash})); }
-  if(error){toast("저장 실패: "+error.message);return;}
-  toast(rec?"매출이 정정되었습니다":"매출이 추가되었습니다");
+  closingDraft.qty={};closingDraft.promo={};closingDraft.deduct="";closingDraft.cash="";closingDraft.gcash="";closingDraft.editId=null;
+  if(rec){
+    closingDraft.editId=rec.id; closingDraft.cash=rec.cash??""; closingDraft.gcash=rec.gcash??"";
+    Object.entries(rec.items||{}).forEach(([id,v])=>{
+      if(id==="_deduct"){ closingDraft.deduct=v; return; }
+      if(String(id).startsWith("_")) return;
+      if(v && typeof v==="object"){ closingDraft.qty[id]=Number(v.q||0); if(v.p) closingDraft.promo[id]=v.p; }
+      else closingDraft.qty[id]=Number(v||0);
+    });
+  }
+  renderAdminEditor();
+}
+function renderAdminEditor(){
+  const d=closingDraft;
+  const menuHtml=["GENERAL","SINGLE"].map(cat=>{const ms=state.menus.filter(m=>(m.category||"GENERAL")===cat); if(!ms.length)return ""; return `<div class="section-label">${CAT_LABEL[cat]}</div><div>${ms.map(menuRowHTML).join("")}</div>`;}).join("");
+  $("screen").innerHTML=`
+    <button class="btn-mini" onclick="screenDaily()" style="margin-bottom:14px">← 일별 매출로</button>
+    <div class="report-title">${branchNameOf(d.branchId)} · ${d.date} <span>· 매출 수정 (관리자)</span></div>
+    <div class="setup-note" style="margin-bottom:12px">${d.editId?`✏️ 저장된 매출을 <b>수정</b> 중입니다 (메뉴 수량·현금·GCash).`:`📝 이 날짜에 매출을 <b>새로 추가</b>합니다.`}</div>
+    <div class="grid-2">
+    <div class="card">
+      <div class="menu-head"><span>메뉴</span><span>가격</span><span>수량</span><span>프로모</span><span>합계</span></div>
+      ${menuHtml}
+      <div class="section-label">주문차감</div>
+      <div class="menu-row" style="grid-template-columns:1fr auto;align-items:center">
+        <span class="m-name">주문차감</span>
+        <div class="peso-field" style="width:150px"><span>${PESO}</span><input id="deduct" type="number" inputmode="numeric" placeholder="0" value="${d.deduct}" oninput="onDeduct()" style="text-align:right"></div>
+      </div>
+    </div>
+    <div class="card sticky">
+      <h2>수입 확인</h2>
+      <div class="pay-input"><label>현금</label><div class="peso-field"><span>${PESO}</span><input id="cash" type="number" inputmode="numeric" placeholder="0" value="${d.cash}" oninput="onPay()"></div></div>
+      <div class="pay-input"><label>GCash</label><div class="peso-field"><span>${PESO}</span><input id="gcash" type="number" inputmode="numeric" placeholder="0" value="${d.gcash}" oninput="onPay()"></div></div>
+      <div class="reconcile">
+        <div class="rec-row"><span>메뉴 합계</span><b id="menuTotal">${PESO}0</b></div>
+        <div class="rec-row" id="deductRow" style="display:none"><span>주문차감</span><b id="deductVal">−${PESO}0</b></div>
+        <div class="rec-row"><span>받은 금액</span><b id="recvTotal">${PESO}0</b></div>
+        <div class="rec-flag idle" id="flag">입력을 시작하세요</div>
+      </div>
+      <button class="btn-primary" id="saveBtn" disabled onclick="saveAdminClosing()">${d.editId?"수정 저장":"저장"}</button>
+      ${d.editId?`<button class="mng-del" style="width:100%;margin-top:10px;padding:12px" onclick="adminDeleteCurrent()">이 매출 삭제</button>`:""}
+      <p class="hint">메뉴 수량을 넣으면 합계가 자동 계산됩니다. 현금+GCash 로 매출이 기록됩니다.</p>
+    </div></div>`;
+  recalc();
+}
+async function saveAdminClosing(){
+  const items={};
+  state.menus.forEach(m=>{ const q=closingDraft.qty[m.id]||0; if(q>0){ const pr=Number(closingDraft.promo[m.id]); items[m.id]= pr>0 ? {q, p:pr} : q; }});
+  const deduct=Number(closingDraft.deduct)||0; if(deduct>0) items._deduct=deduct;
+  $("saveBtn").disabled=true;
+  const payload={ branch_id: closingDraft.branchId, date: closingDraft.date, items, cash: Number(closingDraft.cash)||0, gcash: Number(closingDraft.gcash)||0 };
+  const { error } = closingDraft.editId
+    ? await sb.from("closings").update(payload).eq("id",closingDraft.editId)
+    : await sb.from("closings").insert(payload);
+  if(error){toast("저장 실패: "+error.message);$("saveBtn").disabled=false;return;}
+  toast(closingDraft.editId?"매출이 수정되었습니다":"매출이 추가되었습니다");
   screenDaily();
 }
-async function adminDeleteClosing(){
-  const key=adminBranchKey($("adBranch").value), date=$("adDate").value;
-  if(!date){toast("날짜를 선택하세요");return;}
-  if(!confirm(`${date} · 선택한 호점의 저장된 매출을 삭제할까요?`))return;
-  const { error }=await sb.from("closings").delete().eq("branch_id",key).eq("date",date);
+async function adminDeleteCurrent(){
+  if(!closingDraft.editId){ screenDaily(); return; }
+  if(!confirm(`${branchNameOf(closingDraft.branchId)} · ${closingDraft.date} 매출을 삭제할까요?`))return;
+  const { error }=await sb.from("closings").delete().eq("id",closingDraft.editId);
   if(error){toast("삭제 실패: "+error.message);return;}
   toast("삭제되었습니다");
   screenDaily();
