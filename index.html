@@ -341,7 +341,7 @@ function logout() { state.user = null; renderLogin(); }
 function renderApp() {
   const u = state.user, hq = u.branchId === 0;
   const tabs = hq
-    ? [["dashboard","지점 현황"],["settle","가맹점 정산"],["orders","밀키트 관리"],["daily","일별 매출"],["menurank","메뉴 순위"],["report","월별 보고서"],["manage","관리"]]
+    ? [["dashboard","지점 현황"],["settle","가맹점 정산"],["orders","밀키트 관리"],["payouts","지급 장부"],["daily","일별 매출"],["menurank","메뉴 순위"],["report","월별 보고서"],["manage","관리"]]
     : [["closing",tt("tab_closing")],["myorder",tt("tab_order")]];
   const role = hq ? "전체 관리" : (u.type==="DIRECT"?tt("direct_branch"):tt("franchise_branch"));
   $("root").innerHTML = `
@@ -362,6 +362,7 @@ async function renderScreen() {
   if (t === "dashboard") return screenDashboard();
   if (t === "settle") return screenSettle();
   if (t === "orders") return screenOrders();
+  if (t === "payouts") return screenPayouts();
   if (t === "daily") return screenDaily();
   if (t === "menurank") return screenMenuRank();
   if (t === "report") return screenReport();
@@ -825,23 +826,110 @@ async function screenSettle(){
 
 // ── 본사: 밀키트 관리 ────────────────────────────
 async function screenOrders(){
-  const { data: orders } = await sb.from("kit_orders").select("*").order("id",{ascending:false});
-  const list=(orders||[]).map(o=>{
-    const b=branchOf(o.branch_id);
-    const total=o.items.reduce((s,it)=>s+(kitById(it.kitId)?.unit_price||0)*it.qty,0);
-    const next=STATUS_FLOW[STATUS_FLOW.indexOf(o.status)+1];
-    return `<div class="order-card"><div class="order-top">
-      <div><b>${b?.name||""}</b> <span class="muted">· ${o.date}</span> <span class="badge ${b?.type.toLowerCase()}">${b?.type==="DIRECT"?"직영":"가맹"}</span></div>
-      <span class="status s-${o.status}">${STATUS_LABEL[o.status]}</span></div>
-      <div class="order-items">${o.items.map(it=>`<span class="chip">${kitById(it.kitId)?.name||""} × ${it.qty}</span>`).join("")}</div>
-      <div class="order-foot"><span>대금 <b>${fmt(total)}</b> · ${o.settle_mode==="NET"?"GCash 차감":"별도 청구"}</span>
-      ${o.status!=="DELIVERED"?`<button class="btn-mini" onclick="advanceOrder(${o.id},'${next}')">${STATUS_LABEL[next]}(으)로 →</button>`:'<span class="done-mark">완료</span>'}</div></div>`;
+  const [{ data: orders },{ data: payouts, error: pErr }]=await Promise.all([
+    sb.from("kit_orders").select("*").order("id",{ascending:false}),
+    sb.from("payouts").select("order_id"),
+  ]);
+  const acceptedIds=new Set((payouts||[]).map(p=>String(p.order_id)));
+  const os=orders||[];
+  const byBranch={}; os.forEach(o=>{ (byBranch[o.branch_id]||(byBranch[o.branch_id]=[])).push(o); });
+  const bs=state.branches.filter(b=>b.id!==0);
+  const cards=bs.filter(b=>byBranch[b.id]&&byBranch[b.id].length).map(b=>{
+    const trs=byBranch[b.id].map(o=>{
+      const total=o.items.reduce((s,it)=>s+(kitById(it.kitId)?.unit_price||0)*it.qty,0);
+      const qty=o.items.reduce((s,it)=>s+it.qty,0);
+      const itemsTxt=o.items.map(it=>`${kitById(it.kitId)?.name||it.kitId}×${it.qty}`).join(", ");
+      const next=STATUS_FLOW[STATUS_FLOW.indexOf(o.status)+1];
+      const accepted=acceptedIds.has(String(o.id));
+      return `<tr>
+        <td style="white-space:nowrap">${o.date}</td>
+        <td>${itemsTxt}</td>
+        <td class="num">${qty}</td>
+        <td class="num">${fmt(total)}</td>
+        <td style="white-space:nowrap"><span class="status s-${o.status}">${STATUS_LABEL[o.status]}</span>${o.status!=="DELIVERED"?` <button class="btn-mini" style="padding:3px 8px" onclick="advanceOrder(${o.id},'${next}')">${STATUS_LABEL[next]}→</button>`:""}</td>
+        <td style="white-space:nowrap">${accepted?'<span class="done-mark">장부 등록 ✓</span>':`<button class="btn-mini" onclick="acceptPayout(${o.id})">지급 수락 →</button>`}</td>
+      </tr>`;
+    }).join("");
+    return `<div class="card"><div class="card-head"><h2>${b.name}</h2><span class="badge ${b.type.toLowerCase()}">${b.type==="DIRECT"?"직영":"가맹"}</span></div>
+      <div style="overflow-x:auto"><table class="data-table">
+      <thead><tr><th>날짜</th><th>품목</th><th class="num">수량</th><th class="num">대금</th><th>상태</th><th>지급 수락</th></tr></thead>
+      <tbody>${trs}</tbody></table></div></div>`;
   }).join("");
-  $("screen").innerHTML=`<div class="card"><h2>밀키트 주문 관리</h2>${list||'<p class="empty">주문이 없습니다.</p>'}</div>`;
+  $("screen").innerHTML=`<div class="report-title">밀키트 주문 관리 <span>· 호점별</span></div>
+    ${cards||'<p class="empty">주문이 없습니다.</p>'}
+    ${pErr?`<div class="setup-note" style="margin-top:12px">⚠️ '지급 장부' 테이블이 아직 없습니다. <b>supabase/payouts_table.sql</b> 을 Supabase에서 실행하면 지급 수락·장부 기능이 켜집니다.</div>`:""}`;
 }
 async function advanceOrder(id,next){
   const { error } = await sb.from("kit_orders").update({status:next}).eq("id",id);
   if(error){toast("변경 실패: "+error.message);return;} screenOrders();
+}
+async function acceptPayout(orderId){
+  const { data: od } = await sb.from("kit_orders").select("*").eq("id",orderId).single();
+  if(!od){toast("주문을 찾을 수 없습니다");return;}
+  const items=od.items.map(it=>({name:kitById(it.kitId)?.name||String(it.kitId), qty:it.qty}));
+  const qty=od.items.reduce((s,it)=>s+it.qty,0);
+  const amount=od.items.reduce((s,it)=>s+(kitById(it.kitId)?.unit_price||0)*it.qty,0);
+  const { error }=await sb.from("payouts").insert({ branch_id:String(od.branch_id), order_id:orderId, date:od.date, items, qty, amount, paid:false, note:"" });
+  if(error){toast("수락 실패: "+error.message);return;}
+  toast("지급 장부에 등록되었습니다");
+  screenOrders();
+}
+// ── 본사: 지급 장부 (주간 누적) ──────────────────
+function weekStart(dateStr){ const d=new Date(dateStr+"T00:00:00"); const day=(d.getDay()+6)%7; d.setDate(d.getDate()-day); return d.toISOString().slice(0,10); }
+function addDays(dateStr,n){ const d=new Date(dateStr+"T00:00:00"); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+async function screenPayouts(){
+  const bf=state._poBranch||"ALL"; state._poBranch=bf;
+  const { data, error }=await sb.from("payouts").select("*").order("date",{ascending:false}).order("id",{ascending:false});
+  if(error){ $("screen").innerHTML=`<div class="card"><h2>지급 장부</h2><div class="setup-note">아직 '지급 장부' 테이블이 없습니다. <b>supabase/payouts_table.sql</b> 을 Supabase SQL Editor에서 실행한 뒤 새로고침하세요.</div></div>`; return; }
+  const bs=state.branches.filter(b=>b.id!==0);
+  let rows=data||[];
+  if(bf!=="ALL") rows=rows.filter(p=>String(p.branch_id)===String(bf));
+  const branchOpts=`<option value="ALL" ${bf==="ALL"?"selected":""}>전체 호점</option>`+bs.map(b=>`<option value="${b.id}" ${String(b.id)===String(bf)?"selected":""}>${b.name}</option>`).join("");
+  const groups={}; rows.forEach(p=>{ const w=weekStart(String(p.date).slice(0,10)); (groups[w]||(groups[w]=[])).push(p); });
+  const weeks=Object.keys(groups).sort().reverse();
+  const totAmt=rows.reduce((s,p)=>s+Number(p.amount||0),0);
+  const paidAmt=rows.filter(p=>p.paid).reduce((s,p)=>s+Number(p.amount||0),0);
+  const body=weeks.map(w=>{
+    const list=groups[w], wa=list.reduce((s,p)=>s+Number(p.amount||0),0), wp=list.filter(p=>p.paid).reduce((s,p)=>s+Number(p.amount||0),0);
+    const trs=list.map(p=>{
+      const itemsTxt=(p.items||[]).map(it=>`${it.name}×${it.qty}`).join(", ");
+      return `<tr>
+        <td style="white-space:nowrap">${p.date}</td>
+        <td>${branchNameOf(p.branch_id)}</td>
+        <td>${itemsTxt}</td>
+        <td class="num">${p.qty}</td>
+        <td class="num"><div class="peso-field" style="width:112px;display:inline-flex"><span>${PESO}</span><input type="number" value="${p.amount??0}" onchange="updatePayout(${p.id},'amount',this.value)" style="text-align:right;width:100%"></div></td>
+        <td style="text-align:center"><input type="checkbox" ${p.paid?"checked":""} onchange="updatePayout(${p.id},'paid',this.checked)" style="width:18px;height:18px"></td>
+        <td><input type="text" value="${String(p.note||'').replace(/"/g,'&quot;')}" placeholder="비고" onchange="updatePayout(${p.id},'note',this.value)" style="width:130px;border:1px solid #D8CDBD;border-radius:7px;padding:6px"></td>
+        <td><button class="mng-del" onclick="delPayout(${p.id})">삭제</button></td>
+      </tr>`;
+    }).join("");
+    return `<div class="card"><div class="card-head"><h2>${w} ~ ${addDays(w,6)}</h2><span class="muted">지급액 ${fmt(wa)} · 완료 ${fmt(wp)}</span></div>
+      <div style="overflow-x:auto"><table class="data-table">
+      <thead><tr><th>날짜</th><th>호점</th><th>품목</th><th class="num">수량</th><th class="num">금액</th><th>지급완료</th><th>비고</th><th></th></tr></thead>
+      <tbody>${trs}</tbody></table></div></div>`;
+  }).join("");
+  $("screen").innerHTML=`
+    <div class="filter-bar"><select onchange="state._poBranch=this.value;screenPayouts()">${branchOpts}</select></div>
+    <div class="report-title">지급 장부 <span>· 주간 누적</span></div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-label">총 지급액</div><div class="kpi-value">${fmt(totAmt)}</div></div>
+      <div class="kpi accent"><div class="kpi-label">지급 완료</div><div class="kpi-value">${fmt(paidAmt)}</div></div>
+      <div class="kpi"><div class="kpi-label">미지급</div><div class="kpi-value">${fmt(totAmt-paidAmt)}</div></div>
+    </div>
+    ${body||'<p class="empty">등록된 지급 기록이 없습니다. 밀키트 주문 관리에서 "지급 수락"을 누르면 여기에 쌓입니다.</p>'}`;
+}
+async function updatePayout(id,field,value){
+  const patch={}; patch[field] = field==="amount" ? (Number(value)||0) : (field==="paid" ? !!value : value);
+  const { error }=await sb.from("payouts").update(patch).eq("id",id);
+  if(error){toast("저장 실패: "+error.message);return;}
+  if(field!=="note") screenPayouts();
+}
+async function delPayout(id){
+  if(!confirm("이 지급 기록을 삭제할까요?"))return;
+  const { error }=await sb.from("payouts").delete().eq("id",id);
+  if(error){toast("삭제 실패: "+error.message);return;}
+  toast("삭제되었습니다"); screenPayouts();
 }
 
 // ── 본사: 월별 보고서 ────────────────────────────
