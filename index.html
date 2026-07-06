@@ -867,67 +867,67 @@ async function advanceOrder(id,next){
 async function acceptPayout(orderId){
   const { data: od } = await sb.from("kit_orders").select("*").eq("id",orderId).single();
   if(!od){toast("주문을 찾을 수 없습니다");return;}
-  const items=od.items.map(it=>({name:kitById(it.kitId)?.name||String(it.kitId), qty:it.qty}));
-  const qty=od.items.reduce((s,it)=>s+it.qty,0);
-  const amount=od.items.reduce((s,it)=>s+(kitById(it.kitId)?.unit_price||0)*it.qty,0);
-  const { error }=await sb.from("payouts").insert({ branch_id:String(od.branch_id), order_id:orderId, date:od.date, items, qty, amount, paid:false, note:"" });
+  const rows=od.items.map(it=>({
+    branch_id:String(od.branch_id), order_id:orderId, date:od.date,
+    item: kitById(it.kitId)?.name || String(it.kitId),
+    unit_price: kitById(it.kitId)?.unit_price || 0,
+    qty: it.qty, paid:false, note:""
+  }));
+  const { error }=await sb.from("payouts").insert(rows);
   if(error){toast("수락 실패: "+error.message);return;}
   toast("지급 장부에 등록되었습니다");
   screenOrders();
 }
-// ── 본사: 지급 장부 (주간 누적) ──────────────────
-function weekStart(dateStr){ const d=new Date(dateStr+"T00:00:00"); const day=(d.getDay()+6)%7; d.setDate(d.getDate()-day); return d.toISOString().slice(0,10); }
-function addDays(dateStr,n){ const d=new Date(dateStr+"T00:00:00"); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+// ── 본사: 지급 장부 (호점별 · 품목별) ─────────────
 async function screenPayouts(){
   const bf=state._poBranch||"ALL"; state._poBranch=bf;
-  const { data, error }=await sb.from("payouts").select("*").order("date",{ascending:false}).order("id",{ascending:false});
-  if(error){ $("screen").innerHTML=`<div class="card"><h2>지급 장부</h2><div class="setup-note">아직 '지급 장부' 테이블이 없습니다. <b>supabase/payouts_table.sql</b> 을 Supabase SQL Editor에서 실행한 뒤 새로고침하세요.</div></div>`; return; }
+  const { data, error }=await sb.from("payouts").select("*").order("id");
+  if(error){ $("screen").innerHTML=`<div class="card"><h2>지급 장부</h2><div class="setup-note">아직 '지급 장부' 테이블이 없거나 형식이 달라요. <b>supabase/payouts_table.sql</b> 을 Supabase SQL Editor에서 실행한 뒤 새로고침하세요.</div></div>`; return; }
   const bs=state.branches.filter(b=>b.id!==0);
   let rows=data||[];
   if(bf!=="ALL") rows=rows.filter(p=>String(p.branch_id)===String(bf));
   const branchOpts=`<option value="ALL" ${bf==="ALL"?"selected":""}>전체 호점</option>`+bs.map(b=>`<option value="${b.id}" ${String(b.id)===String(bf)?"selected":""}>${b.name}</option>`).join("");
-  const groups={}; rows.forEach(p=>{ const w=weekStart(String(p.date).slice(0,10)); (groups[w]||(groups[w]=[])).push(p); });
-  const weeks=Object.keys(groups).sort().reverse();
-  const totAmt=rows.reduce((s,p)=>s+Number(p.amount||0),0);
-  const paidAmt=rows.filter(p=>p.paid).reduce((s,p)=>s+Number(p.amount||0),0);
-  const body=weeks.map(w=>{
-    const list=groups[w], wa=list.reduce((s,p)=>s+Number(p.amount||0),0), wp=list.filter(p=>p.paid).reduce((s,p)=>s+Number(p.amount||0),0);
-    const trs=list.map(p=>{
-      const itemsTxt=(p.items||[]).map(it=>`${it.name}×${it.qty}`).join(", ");
-      return `<tr>
-        <td style="white-space:nowrap">${p.date}</td>
-        <td>${branchNameOf(p.branch_id)}</td>
-        <td>${itemsTxt}</td>
-        <td class="num">${p.qty}</td>
-        <td class="num"><div class="peso-field" style="width:112px;display:inline-flex"><span>${PESO}</span><input type="number" value="${p.amount??0}" onchange="updatePayout(${p.id},'amount',this.value)" style="text-align:right;width:100%"></div></td>
-        <td style="text-align:center"><input type="checkbox" ${p.paid?"checked":""} onchange="updatePayout(${p.id},'paid',this.checked)" style="width:18px;height:18px"></td>
-        <td><input type="text" value="${String(p.note||'').replace(/"/g,'&quot;')}" placeholder="비고" onchange="updatePayout(${p.id},'note',this.value)" style="width:130px;border:1px solid #D8CDBD;border-radius:7px;padding:6px"></td>
-        <td><button class="mng-del" onclick="delPayout(${p.id})">삭제</button></td>
-      </tr>`;
-    }).join("");
-    return `<div class="card"><div class="card-head"><h2>${w} ~ ${addDays(w,6)}</h2><span class="muted">지급액 ${fmt(wa)} · 완료 ${fmt(wp)}</span></div>
+  const line=p=>Number(p.unit_price||0)*Number(p.qty||0);
+  const totAmt=rows.reduce((s,p)=>s+line(p),0);
+  const paidAmt=rows.filter(p=>p.paid).reduce((s,p)=>s+line(p),0);
+  const byBranch={}; rows.forEach(p=>{ (byBranch[p.branch_id]||(byBranch[p.branch_id]=[])).push(p); });
+  const cards=bs.filter(b=>byBranch[b.id]&&byBranch[b.id].length).map(b=>{
+    const list=byBranch[b.id];
+    const sub=list.reduce((s,p)=>s+line(p),0), subPaid=list.filter(p=>p.paid).reduce((s,p)=>s+line(p),0);
+    const trs=list.map(p=>`<tr>
+      <td>${p.item||''}</td>
+      <td class="num"><div class="peso-field" style="width:96px;display:inline-flex"><span>${PESO}</span><input type="number" value="${p.unit_price??0}" onchange="updatePayout(${p.id},'unit_price',this.value)" style="text-align:right;width:100%"></div></td>
+      <td class="num">${p.qty}</td>
+      <td style="text-align:center">${p.paid?`<button class="btn-mini" style="background:#E3F3E8;color:#1F7A43;border-color:#1F7A43" onclick="updatePayout(${p.id},'paid',false)">완료</button>`:`<button class="btn-mini" style="background:#F0E9DD;color:#8E7A5E;border-color:#D8CDBD" onclick="updatePayout(${p.id},'paid',true)">대기</button>`}</td>
+      <td class="num"><b>${fmt(line(p))}</b></td>
+      <td><input type="text" value="${String(p.note||'').replace(/"/g,'&quot;')}" placeholder="비고" onchange="updatePayout(${p.id},'note',this.value)" style="width:120px;border:1px solid #D8CDBD;border-radius:7px;padding:6px"></td>
+      <td><button class="mng-del" onclick="delPayout(${p.id})">삭제</button></td>
+    </tr>`).join("");
+    return `<div class="card"><div class="card-head"><h2>${b.name}</h2><span class="badge ${b.type.toLowerCase()}">${b.type==="DIRECT"?"직영":"가맹"}</span></div>
       <div style="overflow-x:auto"><table class="data-table">
-      <thead><tr><th>날짜</th><th>호점</th><th>품목</th><th class="num">수량</th><th class="num">금액</th><th>지급완료</th><th>비고</th><th></th></tr></thead>
-      <tbody>${trs}</tbody></table></div></div>`;
+        <thead><tr><th>품목</th><th class="num">단가</th><th class="num">수량</th><th>지급확인</th><th class="num">합계</th><th>비고</th><th></th></tr></thead>
+        <tbody>${trs}</tbody>
+        <tfoot><tr style="border-top:2px solid #E6DFD4"><td colspan="4"><b>합계</b></td><td class="num"><b>${fmt(sub)}</b></td><td colspan="2" class="muted">지급완료 ${fmt(subPaid)}</td></tr></tfoot>
+      </table></div></div>`;
   }).join("");
   $("screen").innerHTML=`
     <div class="filter-bar"><select onchange="state._poBranch=this.value;screenPayouts()">${branchOpts}</select></div>
-    <div class="report-title">지급 장부 <span>· 주간 누적</span></div>
+    <div class="report-title">지급 장부 <span>· 호점별 · 품목별</span></div>
     <div class="kpi-row">
-      <div class="kpi"><div class="kpi-label">총 지급액</div><div class="kpi-value">${fmt(totAmt)}</div></div>
+      <div class="kpi"><div class="kpi-label">총 합계</div><div class="kpi-value">${fmt(totAmt)}</div></div>
       <div class="kpi accent"><div class="kpi-label">지급 완료</div><div class="kpi-value">${fmt(paidAmt)}</div></div>
       <div class="kpi"><div class="kpi-label">미지급</div><div class="kpi-value">${fmt(totAmt-paidAmt)}</div></div>
     </div>
-    ${body||'<p class="empty">등록된 지급 기록이 없습니다. 밀키트 주문 관리에서 "지급 수락"을 누르면 여기에 쌓입니다.</p>'}`;
+    ${cards||'<p class="empty">등록된 지급 기록이 없습니다. 밀키트 주문 관리에서 "지급 수락"을 누르면 품목별로 여기에 쌓입니다.</p>'}`;
 }
 async function updatePayout(id,field,value){
-  const patch={}; patch[field] = field==="amount" ? (Number(value)||0) : (field==="paid" ? !!value : value);
+  const patch={}; patch[field] = field==="unit_price" ? (Number(value)||0) : (field==="paid" ? !!value : value);
   const { error }=await sb.from("payouts").update(patch).eq("id",id);
   if(error){toast("저장 실패: "+error.message);return;}
   if(field!=="note") screenPayouts();
 }
 async function delPayout(id){
-  if(!confirm("이 지급 기록을 삭제할까요?"))return;
+  if(!confirm("이 품목 기록을 삭제할까요?"))return;
   const { error }=await sb.from("payouts").delete().eq("id",id);
   if(error){toast("삭제 실패: "+error.message);return;}
   toast("삭제되었습니다"); screenPayouts();
