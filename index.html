@@ -802,9 +802,10 @@ async function screenMenuRank(){
 
 // ── 본사: 가맹점 정산 ────────────────────────────
 async function screenSettle(){
+  const fy=fiscalYearBounds(today());
   const [{data:closings},{data:orders}]=await Promise.all([
-    sb.from("closings").select("branch_id,gcash"),
-    sb.from("kit_orders").select("branch_id,items,settle_mode"),
+    sb.from("closings").select("branch_id,gcash").gte("date",fy.start).lt("date",fy.end),
+    sb.from("kit_orders").select("branch_id,items,settle_mode").gte("date",fy.start).lt("date",fy.end),
   ]);
   const fr=state.branches.filter(b=>b.type==="FRANCHISE"&&b.id!==0);
   const rows=fr.map(b=>{
@@ -816,7 +817,7 @@ async function screenSettle(){
     return {...b,gcash,net,sep,payout:gcash-net};
   });
   $("screen").innerHTML=`<div class="card">
-    <div class="card-head"><h2>가맹점 정산</h2><span class="muted">GCash 매출은 본사 계좌로 입금 → 밀키트 대금 차감 후 송금</span></div>
+    <div class="card-head"><h2>가맹점 정산 <span class="muted" style="font-weight:600">· 회계연도 ${fy.label}</span></h2><span class="muted">GCash 매출은 본사 계좌로 입금 → 밀키트 대금 차감 후 송금</span></div>
     <table class="data-table"><thead><tr><th>가맹점</th><th>GCash 매출<small>본사→지점</small></th><th>밀키트(차감)<small>지점→본사</small></th><th>순 송금액</th><th>별도 청구(미수)</th></tr></thead><tbody>
     ${rows.map(r=>`<tr><td><b>${r.name}</b></td><td class="num pos">${fmt(r.gcash)}</td><td class="num neg">− ${fmt(r.net)}</td><td class="num"><b>${fmt(r.payout)}</b></td><td class="num">${r.sep>0?`<span class="tag-due">${fmt(r.sep)}</span>`:"—"}</td></tr>`).join("")}
     </tbody></table>
