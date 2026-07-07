@@ -558,10 +558,12 @@ async function fetchDaily(month){
   (cs||[]).forEach(c=>{
     const d=String(c.date).slice(0,10);
     (byDate[d]||(byDate[d]={}));
-    byDate[d][c.branch_id]=(byDate[d][c.branch_id]||0)+Number(c.cash)+Number(c.gcash);
+    const cell=byDate[d][c.branch_id]||(byDate[d][c.branch_id]={c:0,g:0});
+    cell.c+=Number(c.cash)||0; cell.g+=Number(c.gcash)||0;
   });
   return {dates:Object.keys(byDate).sort(), byDate};
 }
+const dCell=(cell)=>cell?(Number(cell.c||0)+Number(cell.g||0)):0;
 async function screenDaily(){
   const month=state._dailyMonth||thisMonth();
   state._dailyMonth=month;
@@ -585,13 +587,14 @@ function renderDaily(){
   const bs=state.branches.filter(b=>b.id!==0);
   if(!state._dailySel) state._dailySel=new Set(bs.map(b=>String(b.id)));
   const sel=state._dailySel;
-  // ── 날짜 × 호점 표 ──
+  // ── 날짜 × 호점 표 (총액) ──
   const branchTot={}; bs.forEach(b=>branchTot[b.id]=0);
-  let grand=0;
+  let grand=0, cashGrand=0, gcashGrand=0;
   const rows=dates.map(d=>{
     let dayTot=0;
     const cells=bs.map(b=>{
-      const v=byDate[d][b.id]||0; branchTot[b.id]+=v; dayTot+=v;
+      const cell=byDate[d][b.id]; const v=dCell(cell); branchTot[b.id]+=v; dayTot+=v;
+      if(cell){ cashGrand+=Number(cell.c||0); gcashGrand+=Number(cell.g||0); }
       return `<td class="num" style="cursor:pointer${v?"":";color:#C9BFAE"}" onclick="adminEditClosing('${b.id}','${d}')" title="클릭하면 메뉴 수량까지 수정">${v?fmt(v):"–"}</td>`;
     }).join("");
     grand+=dayTot;
@@ -600,19 +603,39 @@ function renderDaily(){
   }).join("");
   const footTot=bs.map(b=>`<td class="num"><b>${fmt(branchTot[b.id])}</b></td>`).join("");
   const head=bs.map(b=>`<th class="num">${b.name}</th>`).join("");
-  const dayCount=dates.length, avg=dayCount?grand/dayCount:0;
+  const dayCount=dates.length;
   // ── 년/월 선택 드롭다운 ──
   const yNow=Number(month.slice(0,4));
   const years=[]; for(let y=yNow+1;y>=yNow-3;y--) years.push(y);
   const yearOpts=years.map(y=>`<option value="${y}" ${y===yNow?"selected":""}>${y}년</option>`).join("");
   const monthOpts=Array.from({length:12},(_,i)=>i+1).map(mn=>{const mm=String(mn).padStart(2,"0");return `<option value="${mm}" ${mm===month.slice(5)?"selected":""}>${mn}월</option>`;}).join("");
+  // ── 호점별 현금·지케쉬 상세 (일자별) ──
+  const dbf=state._dailyDetailBranch||"ALL";
+  const detailOpts=`<option value="ALL" ${dbf==="ALL"?"selected":""}>전체 호점</option>`+bs.map(b=>`<option value="${b.id}" ${String(b.id)===String(dbf)?"selected":""}>${b.name}</option>`).join("");
+  const detailBranches=dbf==="ALL"?bs:bs.filter(b=>String(b.id)===String(dbf));
+  const detailCards=detailBranches.map(b=>{
+    const bdates=dates.filter(d=>byDate[d][b.id]);
+    if(!bdates.length) return "";
+    let tc=0,tg=0;
+    const trs=bdates.map(d=>{
+      const cell=byDate[d][b.id], c=Number(cell.c||0), g=Number(cell.g||0); tc+=c; tg+=g;
+      const wd=weekdayKo(d), wcol=wd==="일"?"#B5322E":wd==="토"?"#3A5A82":"#9A8E7E";
+      return `<tr><td style="white-space:nowrap"><b>${Number(d.slice(8,10))}일</b> <span style="color:${wcol};font-weight:600">(${wd})</span></td><td class="num">${fmt(c)}</td><td class="num">${fmt(g)}</td><td class="num"><b>${fmt(c+g)}</b></td></tr>`;
+    }).join("");
+    return `<div class="card"><div class="card-head"><h2>${b.name} <span class="muted" style="font-weight:600">· 현금/지케쉬</span></h2><span class="badge ${b.type.toLowerCase()}">${b.type==="DIRECT"?"직영":"가맹"}</span></div>
+      <div style="overflow-x:auto"><table class="data-table">
+        <thead><tr><th>날짜</th><th class="num">현금</th><th class="num">지케쉬(GCash)</th><th class="num">합계</th></tr></thead>
+        <tbody>${trs}</tbody>
+        <tfoot><tr style="border-top:2px solid #E6DFD4"><td><b>합계</b></td><td class="num"><b>${fmt(tc)}</b></td><td class="num"><b>${fmt(tg)}</b></td><td class="num"><b>${fmt(tc+tg)}</b></td></tr></tfoot>
+      </table></div></div>`;
+  }).join("")||'<p class="empty">이 달 입력이 없습니다.</p>';
   // ── 호점별 일 매출 꺾은선 (선택 호점 비교) ──
   const dim=new Date(yNow,Number(month.slice(5)),0).getDate();
   const days=Array.from({length:dim},(_,i)=>i+1);
   const labels=days.map(dn=>(dn===1||dn%5===0)?String(dn):"");
   const series=bs.map((b,i)=>({b,i})).filter(({b})=>sel.has(String(b.id))).map(({b,i})=>({
     name:b.name, color:PALETTE[i%PALETTE.length],
-    values:days.map(dn=>{const d=`${month}-${String(dn).padStart(2,"0")}`; return (byDate[d]&&byDate[d][b.id])||0;})
+    values:days.map(dn=>{const d=`${month}-${String(dn).padStart(2,"0")}`; return dCell(byDate[d]&&byDate[d][b.id]);})
   }));
   const chips=bs.map((b,i)=>{const on=sel.has(String(b.id)),c=PALETTE[i%PALETTE.length];
     return `<button class="chip" onclick="toggleDailyBranch('${b.id}')" style="cursor:pointer;border:1.5px solid ${on?c:'#D8CDBD'};background:${on?c+'1A':'#fff'};color:${on?c:'#9A8E7E'}">${b.name}</button>`;}).join("");
@@ -622,11 +645,12 @@ function renderDaily(){
       <select onchange="setDailyMonth('y',this.value)">${yearOpts}</select>
       <select onchange="setDailyMonth('m',this.value)">${monthOpts}</select>
     </div>
-    <div class="report-title">일별 매출 <span>· ${month.replace("-",". ")} · 각 호점 일 매출(현금+GCash)</span></div>
-    <div class="kpi-row">
-      <div class="kpi"><div class="kpi-label">이번 달 전 지점 합계</div><div class="kpi-value">${fmt(grand)}</div></div>
+    <div class="report-title">일별 매출 <span>· ${month.replace("-",". ")} · 각 호점 일 매출</span></div>
+    <div class="kpi-row four">
+      <div class="kpi"><div class="kpi-label">전 지점 합계</div><div class="kpi-value">${fmt(grand)}</div></div>
+      <div class="kpi"><div class="kpi-label">현금 합계</div><div class="kpi-value">${fmt(cashGrand)}</div></div>
+      <div class="kpi accent"><div class="kpi-label">지케쉬(GCash) 합계</div><div class="kpi-value">${fmt(gcashGrand)}</div></div>
       <div class="kpi"><div class="kpi-label">마감 일수</div><div class="kpi-value">${dayCount}일</div></div>
-      <div class="kpi"><div class="kpi-label">일 평균 (전 지점)</div><div class="kpi-value">${fmt(Math.round(avg))}</div></div>
     </div>
     <div class="card">
       <div class="card-head"><h2>매출 정정 · 추가 <span class="muted">(관리자)</span></h2></div>
@@ -638,7 +662,7 @@ function renderDaily(){
       <p class="hint">아래 표의 금액 칸을 클릭하면 그 호점·날짜의 매출을 <b>메뉴 수량까지</b> 수정할 수 있습니다. 저장된 게 없으면 새로 추가됩니다.</p>
     </div>
     <div class="card">
-      <div class="card-head"><h2>날짜별 호점 매출</h2><span class="muted">빈칸(–)은 마감 입력이 없는 날</span></div>
+      <div class="card-head"><h2>날짜별 호점 매출 <span class="muted">· 총액(현금+지케쉬)</span></h2><span class="muted">빈칸(–)은 마감 입력이 없는 날</span></div>
       <div style="overflow-x:auto">
       <table class="data-table">
         <thead><tr><th>날짜</th>${head}<th class="num">일 합계</th></tr></thead>
@@ -647,6 +671,9 @@ function renderDaily(){
       </table>
       </div>
     </div>
+    <div class="report-title" style="margin-top:6px">호점별 현금 · 지케쉬 상세 <span>· 일자별 · 합계 포함</span></div>
+    <div class="filter-bar"><select onchange="state._dailyDetailBranch=this.value;renderDaily()">${detailOpts}</select></div>
+    ${detailCards}
     <div class="card">
       <div class="card-head"><h2>호점별 일 매출 추이 <span class="muted">· 1일~${dim}일</span></h2></div>
       <p class="hint" style="margin:0 0 10px">호점을 눌러 그래프에 추가/제외하세요. 여러 호점을 함께 선택해 비교할 수 있습니다.</p>
