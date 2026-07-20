@@ -530,6 +530,17 @@ async function screenDashboard(){
   const maxT=Math.max(...per.map(b=>b.total),1);
   const rank={}; cs.forEach(c=>Object.entries(c.items).filter(([id])=>!String(id).startsWith("_")).forEach(([id,v])=>{const o=rank[id]||(rank[id]={q:0,rev:0}); o.q+=itemQty(v); o.rev+=itemRev(v,menuById(id));}));
   const ranked=Object.entries(rank).map(([id,o])=>({name:menuById(id)?.name||id,q:o.q,rev:o.rev})).sort((a,b)=>b.rev-a.rev);
+  // ── 호점별 메뉴 판매 순위 (같은 데이터로 분리) ──
+  const perRank={};
+  cs.forEach(c=>{ const br=perRank[c.branch_id]||(perRank[c.branch_id]={});
+    Object.entries(c.items).filter(([id])=>!String(id).startsWith("_")).forEach(([id,v])=>{ const o=br[id]||(br[id]={q:0,rev:0}); o.q+=itemQty(v); o.rev+=itemRev(v,menuById(id)); }); });
+  const branchCards=per.filter(b=>b.total>0||perRank[b.id]).sort((a,b)=>b.total-a.total).map(b=>{
+    const list=Object.entries(perRank[b.id]||{}).map(([id,o])=>({name:menuById(id)?.name||id,q:o.q,rev:o.rev})).sort((x,y)=>y.rev-x.rev);
+    const rows=list.length?list.map((m,i)=>`<tr><td style="color:#9A8E7E;width:28px">${i+1}</td><td>${m.name}</td><td class="num">${m.q}개</td><td class="num">${fmt(m.rev)}</td></tr>`).join(""):'<tr><td colspan="4" class="empty">판매 없음</td></tr>';
+    return `<div class="card"><div class="card-head"><h2>${b.name} <span class="badge ${b.type.toLowerCase()}">${b.type==="DIRECT"?"직영":"가맹"}</span></h2><span class="muted">매출 ${fmt(b.total)} · 현금 ${fmt(b.cash)} · GCash ${fmt(b.gcash)}</span></div>
+      <div style="overflow-x:auto"><table class="data-table"><thead><tr><th>#</th><th>메뉴</th><th class="num">판매</th><th class="num">매출</th></tr></thead>
+      <tbody>${rows}</tbody></table></div></div>`;
+  }).join("");
   $("screen").innerHTML=`
     <div class="report-title">지점 현황 <span>· 회계연도 ${fy.label} (7월~다음해 6월 누적)</span></div>
     <div class="kpi-row">
@@ -545,7 +556,9 @@ async function screenDashboard(){
       <div class="card"><h2>메뉴 판매 순위</h2><table class="data-table"><thead><tr><th>메뉴</th><th>판매</th><th>매출</th></tr></thead><tbody>
         ${ranked.length?ranked.map(m=>`<tr><td>${m.name}</td><td>${m.q}개</td><td>${fmt(m.rev)}</td></tr>`).join(""):'<tr><td colspan="3" class="empty">아직 마감 데이터가 없습니다</td></tr>'}
       </tbody></table></div>
-    </div>`;
+    </div>
+    <div class="report-title" style="margin-top:6px">호점별 메뉴 판매 순위 <span>· 각 호점에서 무엇이 잘 팔리는지</span></div>
+    ${branchCards?`<div class="grid-2">${branchCards}</div>`:'<p class="empty">판매 데이터가 있는 호점이 없습니다.</p>'}`;
 }
 
 // ── 본사: 일별 매출 ──────────────────────────────
