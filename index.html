@@ -843,17 +843,20 @@ async function screenMenuRank(){
 // ── 본사: 가맹점 정산 ────────────────────────────
 async function screenSettle(){
   const fy=fiscalYearBounds(today());
-  const [{data:closings},{data:orders}]=await Promise.all([
+  const [{data:closings},{data:orders},{data:payouts}]=await Promise.all([
     sb.from("closings").select("branch_id,gcash").gte("date",fy.start).lt("date",fy.end),
-    sb.from("kit_orders").select("branch_id,items,settle_mode").gte("date",fy.start).lt("date",fy.end),
+    sb.from("kit_orders").select("id,branch_id,settle_mode").gte("date",fy.start).lt("date",fy.end),
+    sb.from("payouts").select("branch_id,order_id,unit_price,qty").gte("date",fy.start).lt("date",fy.end),
   ]);
+  const orderMode={}; (orders||[]).forEach(o=>{ orderMode[o.id]=o.settle_mode; });
   const fr=state.branches.filter(b=>b.type==="FRANCHISE"&&b.id!==0);
   const rows=fr.map(b=>{
     const gcash=(closings||[]).filter(c=>c.branch_id===b.id).reduce((s,c)=>s+Number(c.gcash),0);
-    const bo=(orders||[]).filter(o=>o.branch_id===b.id);
-    const kitSum=(o)=>o.items.reduce((a,it)=>a+(kitById(it.kitId)?.unit_price||0)*it.qty,0);
-    const net=bo.filter(o=>o.settle_mode==="NET").reduce((s,o)=>s+kitSum(o),0);
-    const sep=bo.filter(o=>o.settle_mode==="SEPARATE").reduce((s,o)=>s+kitSum(o),0);
+    let net=0, sep=0;   // 밀키트 대금은 지급 장부(payouts) 실제 금액에서 합산, 주문의 정산방식으로 구분
+    (payouts||[]).filter(p=>String(p.branch_id)===String(b.id)).forEach(p=>{
+      const amt=Number(p.unit_price||0)*Number(p.qty||0);
+      if(orderMode[p.order_id]==="SEPARATE") sep+=amt; else net+=amt;
+    });
     return {...b,gcash,net,sep,payout:gcash-net};
   });
   $("screen").innerHTML=`<div class="card">
@@ -861,7 +864,7 @@ async function screenSettle(){
     <table class="data-table"><thead><tr><th>가맹점</th><th>GCash 매출<small>본사→지점</small></th><th>밀키트(차감)<small>지점→본사</small></th><th>순 송금액</th><th>별도 청구(미수)</th></tr></thead><tbody>
     ${rows.map(r=>`<tr><td><b>${r.name}</b></td><td class="num pos">${fmt(r.gcash)}</td><td class="num neg">− ${fmt(r.net)}</td><td class="num"><b>${fmt(r.payout)}</b></td><td class="num">${r.sep>0?`<span class="tag-due">${fmt(r.sep)}</span>`:"—"}</td></tr>`).join("")}
     </tbody></table>
-    <div class="formula"><b>순 송금액</b> = GCash 매출 − 차감 선택한 밀키트 대금 &nbsp;|&nbsp; 별도 청구분은 송금에서 빼고 <b>미수금</b>으로 관리</div>
+    <div class="formula"><b>순 송금액</b> = GCash 매출 − 차감 밀키트 대금(<b>지급 장부</b> 기준) &nbsp;|&nbsp; 별도 청구분은 송금에서 빼고 <b>미수금</b>으로 관리</div>
   </div>`;
 }
 
