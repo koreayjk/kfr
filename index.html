@@ -988,39 +988,46 @@ function monthBounds(month){
 }
 async function monthSE(branchId,month){
   const {start,end}=monthBounds(month);
-  const [{data:cs},{data:ex}]=await Promise.all([
+  const [{data:cs},{data:ex},{data:po}]=await Promise.all([
     sb.from("closings").select("cash,gcash").eq("branch_id",branchId).gte("date",start).lt("date",end),
     sb.from("expenses").select("category,amount").eq("branch_id",branchId).gte("date",start).lt("date",end),
+    sb.from("payouts").select("branch_id,unit_price,qty").gte("date",start).lt("date",end),
   ]);
   const closings=cs||[], expenses=ex||[];
   const cash=closings.reduce((s,c)=>s+Number(c.cash),0);
   const gcash=closings.reduce((s,c)=>s+Number(c.gcash),0);
   const sales=cash+gcash;
-  const expTotal=expenses.reduce((s,e)=>s+Number(e.amount),0);
+  const kit=(po||[]).filter(p=>String(p.branch_id)===String(branchId)).reduce((s,p)=>s+Number(p.unit_price||0)*Number(p.qty||0),0);
   const byCat={}; expenses.forEach(e=>byCat[e.category]=(byCat[e.category]||0)+Number(e.amount));
-  return {cash,gcash,sales,expTotal,profit:sales-expTotal,byCat,days:closings.length};
+  if(kit>0) byCat["밀키트"]=(byCat["밀키트"]||0)+kit;
+  const expTotal=expenses.reduce((s,e)=>s+Number(e.amount),0)+kit;
+  return {cash,gcash,sales,expTotal,kit,profit:sales-expTotal,byCat,days:closings.length};
 }
 function monthsEnding(month,count){ const [y,m]=month.split("-").map(Number); const arr=[]; for(let k=count-1;k>=0;k--){ let yy=y,mm=m-k; while(mm<=0){mm+=12;yy--;} arr.push(`${yy}-${String(mm).padStart(2,"0")}`);} return arr; }
 async function fetchTrend(branchId,months){
   const start=months[0]+"-01"; const {end}=monthBounds(months[months.length-1]);
-  const [{data:cs},{data:ex}]=await Promise.all([
+  const [{data:cs},{data:ex},{data:po}]=await Promise.all([
     sb.from("closings").select("cash,gcash,date").eq("branch_id",branchId).gte("date",start).lt("date",end),
     sb.from("expenses").select("amount,date").eq("branch_id",branchId).gte("date",start).lt("date",end),
+    sb.from("payouts").select("branch_id,unit_price,qty,date").gte("date",start).lt("date",end),
   ]);
   const sales={},exp={}; months.forEach(m=>{sales[m]=0;exp[m]=0;});
   (cs||[]).forEach(c=>{const k=c.date.slice(0,7); if(k in sales)sales[k]+=Number(c.cash)+Number(c.gcash);});
   (ex||[]).forEach(e=>{const k=e.date.slice(0,7); if(k in exp)exp[k]+=Number(e.amount);});
+  (po||[]).filter(p=>String(p.branch_id)===String(branchId)).forEach(p=>{const k=String(p.date).slice(0,7); if(k in exp)exp[k]+=Number(p.unit_price||0)*Number(p.qty||0);});
   return months.map(m=>({m,sales:sales[m],exp:exp[m],profit:sales[m]-exp[m]}));
 }
 async function fetchAllBranchMonth(month){
   const {start,end}=monthBounds(month);
-  const [{data:cs},{data:ex}]=await Promise.all([
+  const [{data:cs},{data:ex},{data:po}]=await Promise.all([
     sb.from("closings").select("branch_id,cash,gcash").gte("date",start).lt("date",end),
     sb.from("expenses").select("branch_id,amount").gte("date",start).lt("date",end),
+    sb.from("payouts").select("branch_id,unit_price,qty").gte("date",start).lt("date",end),
   ]);
   return state.branches.filter(b=>b.id!==0).map(b=>{
     const sales=(cs||[]).filter(c=>c.branch_id===b.id).reduce((s,c)=>s+Number(c.cash)+Number(c.gcash),0);
-    const expt=(ex||[]).filter(e=>e.branch_id===b.id).reduce((s,e)=>s+Number(e.amount),0);
+    const kit=(po||[]).filter(p=>String(p.branch_id)===String(b.id)).reduce((s,p)=>s+Number(p.unit_price||0)*Number(p.qty||0),0);
+    const expt=(ex||[]).filter(e=>e.branch_id===b.id).reduce((s,e)=>s+Number(e.amount),0)+kit;
     return {...b,sales,exp:expt,profit:sales-expt,margin:sales>0?(sales-expt)/sales*100:0};
   });
 }
@@ -1062,7 +1069,7 @@ async function screenReport(){
   const dS=delta(cur.sales,pre.sales,false), dE=delta(cur.expTotal,pre.expTotal,true), dP=delta(cur.profit,pre.profit,false);
   const branchOpts=state.branches.filter(b=>b.id!==0).map(b=>`<option value="${b.id}" ${b.id===branchId?"selected":""}>${b.name}</option>`).join("");
   const maxE=Math.max(...Object.values(cur.byCat),1);
-  const ebars=EXPENSE_CATS.filter(c=>cur.byCat[c]).sort((a,b)=>cur.byCat[b]-cur.byCat[a]).map(c=>`
+  const ebars=Object.keys(cur.byCat).filter(c=>cur.byCat[c]).sort((a,b)=>cur.byCat[b]-cur.byCat[a]).map(c=>`
     <div class="ebar-row"><span class="ebar-name">${c}</span>
     <div class="ebar-track"><div class="ebar-fill" style="width:${(cur.byCat[c]/maxE)*100}%"></div></div>
     <span class="ebar-val">${fmt(cur.byCat[c])}</span></div>`).join("")||'<p class="hint">등록된 지출이 없습니다.</p>';
@@ -1108,10 +1115,11 @@ async function screenReport(){
           <div class="pl-row"><span>매출 합계</span><b>${fmt(cur.sales)}</b></div>
           <div class="pl-row pl-sub"><span>· 현금</span><b>${fmt(cur.cash)}</b></div>
           <div class="pl-row pl-sub"><span>· GCash</span><b>${fmt(cur.gcash)}</b></div>
+          <div class="pl-row pl-sub"><span>· 밀키트 대금(지급 장부)</span><b>${fmt(cur.kit||0)}</b></div>
           <div class="pl-row"><span>− 지출 합계</span><b style="color:#B5322E">${fmt(cur.expTotal)}</b></div>
           <div class="pl-row total"><span>순이익</span><b style="color:${cur.profit>=0?'#1F7A43':'#B5322E'}">${fmt(cur.profit)}</b></div>
         </div>
-        <p class="hint">마감 ${cur.days}일 집계 · 밀키트 대금은 정산 화면에서 별도 관리</p>
+        <p class="hint">마감 ${cur.days}일 집계 · 지출에 <b>밀키트 대금(지급 장부)</b> 포함</p>
       </div>
       <div class="card"><h2>지출 항목별 내역</h2>${ebars}</div>
     </div>
