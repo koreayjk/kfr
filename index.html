@@ -924,11 +924,14 @@ async function acceptPayout(orderId){
 // ── 본사: 지급 장부 (호점별 · 품목별) ─────────────
 async function screenPayouts(){
   const bf=state._poBranch||"ALL"; state._poBranch=bf;
+  const pm=state._poMonth||thisMonth(); state._poMonth=pm;
+  const pAll=!!state._poAll;
   const { data, error }=await sb.from("payouts").select("*").order("id");
   if(error){ $("screen").innerHTML=`<div class="card"><h2>지급 장부</h2><div class="setup-note">아직 '지급 장부' 테이블이 없거나 형식이 달라요. <b>supabase/payouts_table.sql</b> 을 Supabase SQL Editor에서 실행한 뒤 새로고침하세요.</div></div>`; return; }
   const bs=state.branches.filter(b=>b.id!==0);
   let rows=data||[];
   if(bf!=="ALL") rows=rows.filter(p=>String(p.branch_id)===String(bf));
+  if(!pAll) rows=rows.filter(p=>String(p.date).slice(0,7)===pm);
   const branchOpts=`<option value="ALL" ${bf==="ALL"?"selected":""}>전체 호점</option>`+bs.map(b=>`<option value="${b.id}" ${String(b.id)===String(bf)?"selected":""}>${b.name}</option>`).join("");
   const line=p=>Number(p.unit_price||0)*Number(p.qty||0);
   const totAmt=rows.reduce((s,p)=>s+line(p),0);
@@ -954,8 +957,12 @@ async function screenPayouts(){
       </table></div></div>`;
   }).join("");
   $("screen").innerHTML=`
-    <div class="filter-bar"><select onchange="state._poBranch=this.value;screenPayouts()">${branchOpts}</select></div>
-    <div class="report-title">지급 장부 <span>· 호점별 · 품목별</span></div>
+    <div class="filter-bar">
+      <select onchange="state._poBranch=this.value;screenPayouts()">${branchOpts}</select>
+      <input type="month" value="${pm}" ${pAll?'disabled':''} onchange="state._poMonth=this.value;state._poAll=false;screenPayouts()">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#6B5E4C;white-space:nowrap"><input type="checkbox" ${pAll?'checked':''} onchange="state._poAll=this.checked;screenPayouts()"> 전체 기간</label>
+    </div>
+    <div class="report-title">지급 장부 <span>· ${pAll?'전체 기간':pm.replace('-','. ')} · 호점별 · 품목별</span></div>
     <div class="kpi-row">
       <div class="kpi"><div class="kpi-label">총 합계</div><div class="kpi-value">${fmt(totAmt)}</div></div>
       <div class="kpi accent"><div class="kpi-label">지급 완료</div><div class="kpi-value">${fmt(paidAmt)}</div></div>
