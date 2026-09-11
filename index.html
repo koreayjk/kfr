@@ -9,6 +9,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, "Pretendard", "Segoe UI", sans-serif; background:#F6F2EC; color:#1E1A17; -webkit-text-size-adjust:100%; }
 input, select, button { font-family: inherit; }
+/* muted text darkened for AA contrast (was #807460) */
 :focus-visible { outline:2px solid #B5322E; outline-offset:2px; }
 input:focus, select:focus, textarea:focus { border-color:#B5322E; }
 .peso-field:focus-within { border-color:#B5322E; }
@@ -16,7 +17,7 @@ input:focus, select:focus, textarea:focus { border-color:#B5322E; }
 .login-card { background:#fff; border-radius:20px; padding:34px 30px; width:100%; max-width:390px; box-shadow:0 14px 40px rgba(110,60,30,.12); }
 .login-logo-img { width:100%; max-width:260px; display:block; margin:6px auto 18px; }
 .login-card h1 { text-align:center; font-size:18px; margin-bottom:4px; letter-spacing:-.3px; }
-.login-card .sub { text-align:center; color:#9A8E7E; font-size:12px; margin-bottom:22px; letter-spacing:.5px; text-transform:uppercase; }
+.login-card .sub { text-align:center; color:#807460; font-size:12px; margin-bottom:22px; letter-spacing:.5px; text-transform:uppercase; }
 .field { margin-bottom:14px; }
 .field label { display:block; font-size:13px; font-weight:600; margin-bottom:6px; }
 .field select, .field input { width:100%; border:1.5px solid #D8CDBD; border-radius:11px; padding:12px; font-size:15px; background:#fff; }
@@ -26,10 +27,10 @@ input:focus, select:focus, textarea:focus { border-color:#B5322E; }
 .topbar-logo { height:30px; }
 .who { display:flex; align-items:center; gap:10px; }
 .who-name { font-size:13px; font-weight:600; text-align:right; }
-.who-name small { display:block; color:#9A8E7E; font-weight:500; }
+.who-name small { display:block; color:#807460; font-weight:500; }
 .logout { border:1px solid #D8CDBD; background:#fff; border-radius:9px; padding:7px 12px; font-size:12px; cursor:pointer; color:#5E4A36; }
 .tabs { display:flex; gap:2px; padding:10px 20px 0; background:#fff; border-bottom:1px solid #E6DFD4; overflow-x:auto; }
-.tab { border:none; background:none; padding:10px 14px; font-size:14px; font-weight:600; color:#9A8E7E; cursor:pointer; border-bottom:2.5px solid transparent; white-space:nowrap; }
+.tab { border:none; background:none; padding:10px 14px; font-size:14px; font-weight:600; color:#807460; cursor:pointer; border-bottom:2.5px solid transparent; white-space:nowrap; }
 .tab.on { color:#B5322E; border-bottom-color:#B5322E; }
 .content { padding:20px; max-width:1080px; margin:0 auto; }
 .grid-2 { display:grid; grid-template-columns:1.4fr 1fr; gap:18px; }
@@ -39,15 +40,15 @@ input:focus, select:focus, textarea:focus { border-color:#B5322E; }
 .card h2 { font-size:16px; font-weight:800; margin:0 0 14px; letter-spacing:-.3px; }
 .card-head h2 { margin:0; }
 .date-pill { background:#F3ECE0; color:#8E7A5E; font-size:12px; font-weight:600; padding:5px 10px; border-radius:20px; border:none; }
-.muted { color:#9A8E7E; font-size:12px; }
+.muted { color:#807460; font-size:12px; }
 .section-label { font-size:12px; font-weight:700; color:#B5322E; text-transform:uppercase; letter-spacing:.5px; margin:18px 0 8px; }
 .menu-row { display:grid; grid-template-columns:1fr auto auto auto; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #F0E9DD; }
 .m-name { font-weight:600; font-size:14px; }
-.m-price { color:#9A8E7E; font-size:13px; }
+.m-price { color:#807460; font-size:13px; }
 .m-sub { font-weight:700; font-variant-numeric:tabular-nums; min-width:62px; text-align:right; color:#5E4A36; }
 .stepper { display:flex; align-items:center; gap:4px; }
-.stepper button { width:28px; height:28px; border:1px solid #D8CDBD; background:#fff; border-radius:7px; font-size:16px; cursor:pointer; color:#5E4A36; }
-.stepper input { width:46px; text-align:center; border:1px solid #D8CDBD; border-radius:7px; padding:6px; font-size:14px; font-variant-numeric:tabular-nums; }
+.stepper button { width:38px; height:38px; border:1px solid #D8CDBD; background:#fff; border-radius:8px; font-size:18px; cursor:pointer; color:#5E4A36; }
+.stepper input { width:52px; text-align:center; border:1px solid #D8CDBD; border-radius:8px; padding:8px; font-size:15px; font-variant-numeric:tabular-nums; }
 .exp-row { display:grid; grid-template-columns:1.2fr 100px auto; gap:8px; margin-bottom:8px; }
 .exp-row select, .exp-row input { border:1px solid #D8CDBD; border-radius:8px; padding:9px 10px; font-size:13px; width:100%; }
 .exp-add { border:1px solid #D8CDBD; background:#F6F2EC; border-radius:8px; width:38px; cursor:pointer; font-size:17px; color:#5E4A36; }
@@ -55,7 +56,7 @@ input:focus, select:focus, textarea:focus { border-color:#B5322E; }
 .pay-input { margin-bottom:12px; }
 .pay-input label { display:block; font-size:13px; font-weight:600; margin-bottom:5px; }
 .peso-field { display:flex; align-items:center; border:1.5px solid #D8CDBD; border-radius:10px; overflow:hidden; }
-.peso-field span { padding:0 12px; color:#9A8E7E; font-weight:700; background:#F6F2EC; align-self:stretch; display:flex; align-items:center; }
+.peso-field span { padding:0 12px; color:#807460; font-weight:700; background:#F6F2EC; align-self:stretch; display:flex; align-items:center; }
 .peso-field input { flex:1; border:none; padding:12px; font-size:16px; font-variant-numeric:tabular-nums; outline:none; width:100%; }
 .reconcile { background:#FAF6EF; border-radius:12px; padding:14px; margin:14px 0; }
 .rec-row { display:flex; justify-content:space-between; padding:5px 0; font-size:14px; }
@@ -64,16 +65,16 @@ input:focus, select:focus, textarea:focus { border-color:#B5322E; }
 .rec-flag { margin-top:8px; padding:10px 12px; border-radius:9px; font-weight:700; font-size:14px; text-align:center; }
 .rec-flag.ok { background:#E3F3E8; color:#1F7A43; }
 .rec-flag.bad { background:#FBE4E3; color:#B5322E; }
-.rec-flag.idle { background:#F0E9DD; color:#9A8E7E; font-weight:500; }
+.rec-flag.idle { background:#F0E9DD; color:#807460; font-weight:500; }
 .btn-primary { width:100%; background:#B5322E; color:#fff; border:none; padding:14px; border-radius:11px; font-size:15px; font-weight:700; cursor:pointer; margin-top:6px; }
 .btn-primary:disabled { background:#D8CDBD; cursor:not-allowed; }
-.hint { font-size:12px; color:#9A8E7E; margin:10px 0 0; line-height:1.5; }
+.hint { font-size:12px; color:#807460; margin:10px 0 0; line-height:1.5; }
 .prev-row { display:flex; justify-content:space-between; padding:7px 0; font-size:13px; border-bottom:1px solid #F0E9DD; }
 .kpi-row { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:18px; }
 @media(max-width:820px){ .kpi-row{ grid-template-columns:1fr; } }
 .kpi { background:#fff; border:1px solid #E6DFD4; border-radius:14px; padding:18px; }
 .kpi.accent { background:linear-gradient(135deg,#B5322E,#8E2420); border:none; }
-.kpi-label { font-size:12px; color:#9A8E7E; margin-bottom:8px; }
+.kpi-label { font-size:12px; color:#807460; margin-bottom:8px; }
 .kpi.accent .kpi-label { color:#F3C9C7; }
 .kpi-value { font-size:23px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:-.5px; }
 .kpi.accent .kpi-value { color:#fff; }
@@ -86,13 +87,15 @@ input:focus, select:focus, textarea:focus { border-color:#B5322E; }
 .badge.direct { background:#E8EEF6; color:#3A5A82; }
 .badge.franchise { background:#F6EEE2; color:#9A6A1E; }
 .data-table { width:100%; border-collapse:collapse; font-size:13px; }
-.data-table th { text-align:left; color:#9A8E7E; font-size:11px; text-transform:uppercase; letter-spacing:.4px; padding:8px 6px; border-bottom:2px solid #E6DFD4; }
+.data-table th { text-align:left; color:#807460; font-size:11px; text-transform:uppercase; letter-spacing:.4px; padding:8px 6px; border-bottom:2px solid #E6DFD4; }
 .data-table th small { display:block; font-weight:500; text-transform:none; letter-spacing:0; color:#BDB2A0; }
 .data-table td { padding:9px 6px; border-bottom:1px solid #F0E9DD; }
+.tscroll { overflow:auto; max-height:76vh; -webkit-overflow-scrolling:touch; }
+.tscroll thead th { position:sticky; top:0; background:#fff; z-index:2; }
 .data-table .num { text-align:right; font-variant-numeric:tabular-nums; }
 .data-table .pos { color:#1F7A43; }
 .data-table .neg { color:#B5322E; }
-.empty { color:#9A8E7E; text-align:center; padding:18px; }
+.empty { color:#807460; text-align:center; padding:18px; }
 .tag-due { background:#FBE4E3; color:#B5322E; padding:2px 8px; border-radius:6px; font-weight:700; }
 .formula { margin-top:14px; background:#FAF6EF; border-radius:10px; padding:12px 14px; font-size:13px; color:#5E4A36; line-height:1.6; }
 .order-card { border:1px solid #E6DFD4; border-radius:12px; padding:14px; margin-bottom:12px; }
@@ -105,13 +108,13 @@ input:focus, select:focus, textarea:focus { border-color:#B5322E; }
 .s-CONFIRMED { background:#E8EEF6; color:#3A5A82; }
 .s-SHIPPING { background:#FBF1DC; color:#9A6A1E; }
 .s-DELIVERED { background:#E3F3E8; color:#1F7A43; }
-.btn-mini { border:1px solid #B5322E; color:#B5322E; background:#fff; border-radius:8px; padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer; }
+.btn-mini { border:1px solid #B5322E; color:#B5322E; background:#fff; border-radius:8px; padding:9px 12px; font-size:12px; font-weight:700; cursor:pointer; }
 .done-mark { color:#1F7A43; font-weight:700; font-size:13px; }
 .mode-pick { margin:14px 0; }
 .mode-pick label { display:block; border:1px solid #D8CDBD; border-radius:9px; padding:11px 12px; margin-bottom:6px; font-size:13px; font-weight:600; cursor:pointer; }
 .mode-pick label.on { border-color:#B5322E; background:#FBF1F0; color:#B5322E; }
 .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#1E1A17; color:#fff; padding:13px 22px; border-radius:30px; font-size:14px; font-weight:600; box-shadow:0 8px 24px rgba(0,0,0,.25); z-index:99; }
-.loading { text-align:center; padding:40px; color:#9A8E7E; }
+.loading { text-align:center; padding:40px; color:#807460; }
 .report-pl .pl-row { display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid #F0E9DD; font-size:14px; }
 .report-pl .pl-row.total { border-top:2px solid #E6DFD4; border-bottom:none; font-weight:800; font-size:17px; padding-top:13px; margin-top:4px; }
 .report-pl b { font-variant-numeric:tabular-nums; }
@@ -122,26 +125,26 @@ input:focus, select:focus, textarea:focus { border-color:#B5322E; }
 @media(max-width:820px){ .kpi-row.four{ grid-template-columns:repeat(2,1fr); } }
 .kpi .delta { font-size:12px; font-weight:700; margin-top:5px; }
 .kpi.accent .delta { color:#F3C9C7; }
-.delta.up{ color:#1F7A43; } .delta.down{ color:#B5322E; } .delta.flat{ color:#9A8E7E; }
+.delta.up{ color:#1F7A43; } .delta.down{ color:#B5322E; } .delta.flat{ color:#807460; }
 .kpi.accent .delta.up,.kpi.accent .delta.down,.kpi.accent .delta.flat{ color:#F3C9C7; }
 .report-title { font-size:18px; font-weight:800; margin:2px 0 16px; letter-spacing:-.3px; }
-.report-title span { color:#9A8E7E; font-weight:600; font-size:14px; }
+.report-title span { color:#807460; font-weight:600; font-size:14px; }
 .ebar-row { display:grid; grid-template-columns:110px 1fr auto; align-items:center; gap:10px; margin-bottom:10px; }
 .ebar-name { font-size:13px; font-weight:600; }
 .ebar-track { background:#F0E9DD; border-radius:6px; height:12px; overflow:hidden; }
 .ebar-fill { background:linear-gradient(90deg,#E0A93F,#C9842A); height:100%; }
 .ebar-val { font-size:13px; font-weight:700; font-variant-numeric:tabular-nums; min-width:66px; text-align:right; }
-.pl-sub { padding-left:14px; color:#9A8E7E; font-size:13px; }
+.pl-sub { padding-left:14px; color:#807460; font-size:13px; }
 .legend { display:flex; gap:18px; margin-bottom:6px; }
 .legend span { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:#5E4A36; }
 .legend i { width:11px; height:11px; border-radius:3px; display:inline-block; }
 .cmp-table tr.me { background:#FBF1F0; }
 .cmp-table tr.me td:first-child { font-weight:800; color:#B5322E; }
 .minibar { display:inline-block; height:8px; border-radius:4px; background:linear-gradient(90deg,#C9453F,#B5322E); vertical-align:middle; margin-right:6px; }
-.menu-head { display:grid; grid-template-columns:1fr auto auto 60px 64px; gap:10px; font-size:11px; color:#9A8E7E; font-weight:700; text-transform:uppercase; letter-spacing:.4px; padding:0 0 6px; border-bottom:2px solid #E6DFD4; margin-bottom:4px; }
+.menu-head { display:grid; grid-template-columns:1fr auto auto 60px 64px; gap:10px; font-size:11px; color:#807460; font-weight:700; text-transform:uppercase; letter-spacing:.4px; padding:0 0 6px; border-bottom:2px solid #E6DFD4; margin-bottom:4px; }
 .menu-head span:not(:first-child){ text-align:center; }
 .menu-row.promo-row { grid-template-columns:1fr auto auto 60px 64px; }
-.m-en { display:block; font-size:11px; color:#9A8E7E; font-weight:500; font-style:normal; }
+.m-en { display:block; font-size:11px; color:#807460; font-weight:500; font-style:normal; }
 .promo-box { width:60px; text-align:center; border:1px dashed #C9842A; border-radius:7px; padding:6px 4px; font-size:13px; font-variant-numeric:tabular-nums; background:#FFFDF8; }
 .promo-box::placeholder { color:#D8CDBD; }
 .add-form { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; align-items:center; }
@@ -151,12 +154,12 @@ input:focus, select:focus, textarea:focus { border-color:#B5322E; }
 .mng-price { font-weight:700; font-variant-numeric:tabular-nums; color:#5E4A36; }
 .mng-del { border:1px solid #E0C0BE; color:#B5322E; background:#fff; border-radius:7px; padding:5px 10px; font-size:12px; font-weight:600; cursor:pointer; }
 .lang-toggle { display:flex; gap:4px; }
-.lang-toggle button { border:1px solid #D8CDBD; background:#fff; border-radius:8px; padding:6px 10px; font-size:12px; font-weight:700; color:#9A8E7E; cursor:pointer; white-space:nowrap; }
+.lang-toggle button { border:1px solid #D8CDBD; background:#fff; border-radius:8px; padding:6px 10px; font-size:12px; font-weight:700; color:#807460; cursor:pointer; white-space:nowrap; }
 .lang-toggle button.on { background:#B5322E; color:#fff; border-color:#B5322E; }
-.lang-sub { display:block; font-size:11px; color:#9A8E7E; font-weight:500; font-style:italic; margin-top:1px; }
+.lang-sub { display:block; font-size:11px; color:#807460; font-weight:500; font-style:italic; margin-top:1px; }
 .btn-primary .lang-sub { color:#F3C9C7; font-weight:600; }
 .mode-pick label .lang-sub { font-weight:500; opacity:.75; }
-.update-stamp { font-size:12.5px; color:#9A8E7E; font-weight:600; margin:0 0 16px; }
+.update-stamp { font-size:12.5px; color:#807460; font-weight:600; margin:0 0 16px; }
 .update-stamp b { color:#5E4A36; }
 .mng-row.editable { grid-template-columns:1fr 96px auto; }
 .mng-price-input { width:96px; text-align:right; border:1px solid #D8CDBD; border-radius:7px; padding:6px 8px; font-size:13px; font-variant-numeric:tabular-nums; }
@@ -539,9 +542,9 @@ async function screenDashboard(){
     Object.entries(c.items).filter(([id])=>!String(id).startsWith("_")).forEach(([id,v])=>{ const o=br[id]||(br[id]={q:0,rev:0}); o.q+=itemQty(v); o.rev+=itemRev(v,menuById(id)); }); });
   const branchCards=per.filter(b=>b.total>0||perRank[b.id]).sort((a,b)=>b.total-a.total).map(b=>{
     const list=Object.entries(perRank[b.id]||{}).map(([id,o])=>({name:menuById(id)?.name||id,q:o.q,rev:o.rev})).sort((x,y)=>y.rev-x.rev);
-    const rows=list.length?list.map((m,i)=>`<tr><td style="color:#9A8E7E;width:28px">${i+1}</td><td>${m.name}</td><td class="num">${m.q}개</td><td class="num">${fmt(m.rev)}</td></tr>`).join(""):'<tr><td colspan="4" class="empty">판매 없음</td></tr>';
+    const rows=list.length?list.map((m,i)=>`<tr><td style="color:#807460;width:28px">${i+1}</td><td>${m.name}</td><td class="num">${m.q}개</td><td class="num">${fmt(m.rev)}</td></tr>`).join(""):'<tr><td colspan="4" class="empty">판매 없음</td></tr>';
     return `<div class="card"><div class="card-head"><h2>${b.name} <span class="badge ${b.type.toLowerCase()}">${b.type==="DIRECT"?"직영":"가맹"}</span></h2><span class="muted">매출 ${fmt(b.total)} · 현금 ${fmt(b.cash)} · GCash ${fmt(b.gcash)}</span></div>
-      <div style="overflow-x:auto"><table class="data-table"><thead><tr><th>#</th><th>메뉴</th><th class="num">판매</th><th class="num">매출</th></tr></thead>
+      <div class="tscroll"><table class="data-table"><thead><tr><th>#</th><th>메뉴</th><th class="num">판매</th><th class="num">매출</th></tr></thead>
       <tbody>${rows}</tbody></table></div></div>`;
   }).join("");
   $("screen").innerHTML=`
@@ -614,7 +617,7 @@ function renderDaily(){
       return `<td class="num" style="cursor:pointer${v?"":";color:#C9BFAE"}" onclick="adminEditClosing('${b.id}','${d}')" title="클릭하면 메뉴 수량까지 수정">${v?fmt(v):"–"}</td>`;
     }).join("");
     grand+=dayTot;
-    const wd=weekdayKo(d), wc=wd==="일"?"#B5322E":wd==="토"?"#3A5A82":"#9A8E7E";
+    const wd=weekdayKo(d), wc=wd==="일"?"#B5322E":wd==="토"?"#3A5A82":"#807460";
     return `<tr><td style="white-space:nowrap"><b>${Number(d.slice(8,10))}일</b> <span style="color:${wc};font-weight:600">(${wd})</span></td>${cells}<td class="num"><b>${fmt(dayTot)}</b></td></tr>`;
   }).join("");
   const footTot=bs.map(b=>`<td class="num"><b>${fmt(branchTot[b.id])}</b></td>`).join("");
@@ -635,11 +638,11 @@ function renderDaily(){
     let tc=0,tg=0;
     const trs=bdates.map(d=>{
       const cell=byDate[d][b.id], c=Number(cell.c||0), g=Number(cell.g||0); tc+=c; tg+=g;
-      const wd=weekdayKo(d), wcol=wd==="일"?"#B5322E":wd==="토"?"#3A5A82":"#9A8E7E";
+      const wd=weekdayKo(d), wcol=wd==="일"?"#B5322E":wd==="토"?"#3A5A82":"#807460";
       return `<tr><td style="white-space:nowrap"><b>${Number(d.slice(8,10))}일</b> <span style="color:${wcol};font-weight:600">(${wd})</span></td><td class="num">${fmt(c)}</td><td class="num">${fmt(g)}</td><td class="num"><b>${fmt(c+g)}</b></td></tr>`;
     }).join("");
     return `<div class="card"><div class="card-head"><h2>${b.name} <span class="muted" style="font-weight:600">· 현금/지케쉬</span></h2><span class="badge ${b.type.toLowerCase()}">${b.type==="DIRECT"?"직영":"가맹"}</span></div>
-      <div style="overflow-x:auto"><table class="data-table">
+      <div class="tscroll"><table class="data-table">
         <thead><tr><th>날짜</th><th class="num">현금</th><th class="num">지케쉬(GCash)</th><th class="num">합계</th></tr></thead>
         <tbody>${trs}</tbody>
         <tfoot><tr style="border-top:2px solid #E6DFD4"><td><b>합계</b></td><td class="num"><b>${fmt(tc)}</b></td><td class="num"><b>${fmt(tg)}</b></td><td class="num"><b>${fmt(tc+tg)}</b></td></tr></tfoot>
@@ -654,7 +657,7 @@ function renderDaily(){
     values:days.map(dn=>{const d=`${month}-${String(dn).padStart(2,"0")}`; return dCell(byDate[d]&&byDate[d][b.id]);})
   }));
   const chips=bs.map((b,i)=>{const on=sel.has(String(b.id)),c=PALETTE[i%PALETTE.length];
-    return `<button class="chip" onclick="toggleDailyBranch('${b.id}')" style="cursor:pointer;border:1.5px solid ${on?c:'#D8CDBD'};background:${on?c+'1A':'#fff'};color:${on?c:'#9A8E7E'}">${b.name}</button>`;}).join("");
+    return `<button class="chip" onclick="toggleDailyBranch('${b.id}')" style="cursor:pointer;border:1.5px solid ${on?c:'#D8CDBD'};background:${on?c+'1A':'#fff'};color:${on?c:'#807460'}">${b.name}</button>`;}).join("");
   const chart = series.length ? svgTrend(labels, series) : `<p class="empty">비교할 호점을 선택하세요.</p>`;
   $("screen").innerHTML=`
     <div class="filter-bar">
@@ -679,7 +682,7 @@ function renderDaily(){
     </div>
     <div class="card">
       <div class="card-head"><h2>날짜별 호점 매출 <span class="muted">· 총액(현금+지케쉬)</span></h2><span class="muted">빈칸(–)은 마감 입력이 없는 날</span></div>
-      <div style="overflow-x:auto">
+      <div class="tscroll">
       <table class="data-table">
         <thead><tr><th>날짜</th>${head}<th class="num">일 합계</th></tr></thead>
         <tbody>${rows||`<tr><td colspan="${bs.length+2}" class="empty">이 달에는 마감 데이터가 없습니다.</td></tr>`}</tbody>
@@ -817,7 +820,7 @@ async function screenMenuRank(){
   const scope=`${branchId==="ALL"?"전체 호점":(selBranch?.name||branchId)} · ${month.replace("-",". ")}${day==="ALL"?" (월간)":" "+Number(day)+"일"}`;
   const maxRev=Math.max(...ranked.map(r=>r.rev),1);
   const rows=ranked.map((r,i)=>`<tr>
-    <td style="color:#9A8E7E;width:34px">${i+1}</td>
+    <td style="color:#807460;width:34px">${i+1}</td>
     <td>${r.name}</td>
     <td class="num">${r.q}개</td>
     <td class="num"><span class="minibar" style="width:${Math.max(4,(r.rev/maxRev)*70)}px"></span>${fmt(r.rev)}</td></tr>`).join("");
@@ -898,7 +901,7 @@ async function screenOrders(){
       </tr>`;
     }).join("");
     return `<div class="card"><div class="card-head"><h2>${b.name}</h2><span class="badge ${b.type.toLowerCase()}">${b.type==="DIRECT"?"직영":"가맹"}</span></div>
-      <div style="overflow-x:auto"><table class="data-table">
+      <div class="tscroll"><table class="data-table">
       <thead><tr><th>날짜</th><th>품목</th><th class="num">수량</th><th class="num">대금</th><th>상태</th><th>지급 수락</th></tr></thead>
       <tbody>${trs}</tbody></table></div></div>`;
   }).join("");
@@ -953,7 +956,7 @@ async function screenPayouts(){
       <td><button class="mng-del" onclick="delPayout(${p.id})">삭제</button></td>
     </tr>`).join("");
     return `<div class="card"><div class="card-head"><h2>${b.name}</h2><span class="badge ${b.type.toLowerCase()}">${b.type==="DIRECT"?"직영":"가맹"}</span></div>
-      <div style="overflow-x:auto"><table class="data-table">
+      <div class="tscroll"><table class="data-table">
         <thead><tr><th>품목</th><th class="num">단가</th><th class="num">수량</th><th>지급확인</th><th class="num">합계</th><th>비고</th><th></th></tr></thead>
         <tbody>${trs}</tbody>
         <tfoot><tr style="border-top:2px solid #E6DFD4"><td colspan="4"><b>합계</b></td><td class="num"><b>${fmt(sub)}</b></td><td colspan="2" class="muted">지급완료 ${fmt(subPaid)}</td></tr></tfoot>
@@ -1050,8 +1053,8 @@ function svgTrend(labels, series){
   let grid="",ylab="";
   for(let i=0;i<=ny;i++){ const val=min+(max-min)*i/ny, yy=pt+ih-(ih*i/ny);
     grid+=`<line x1="${pl}" y1="${yy.toFixed(1)}" x2="${W-pr}" y2="${yy.toFixed(1)}" stroke="#EEE6DA"/>`;
-    ylab+=`<text x="${pl-8}" y="${(yy+4).toFixed(1)}" text-anchor="end" font-size="11" fill="#9A8E7E">${kfmt(val)}</text>`; }
-  const xlab=labels.map((l,i)=>`<text x="${x(i).toFixed(1)}" y="${H-10}" text-anchor="middle" font-size="11" fill="#9A8E7E">${l}</text>`).join("");
+    ylab+=`<text x="${pl-8}" y="${(yy+4).toFixed(1)}" text-anchor="end" font-size="11" fill="#807460">${kfmt(val)}</text>`; }
+  const xlab=labels.map((l,i)=>`<text x="${x(i).toFixed(1)}" y="${H-10}" text-anchor="middle" font-size="11" fill="#807460">${l}</text>`).join("");
   const paths=series.map(s=>{
     const pts=s.values.map((v,i)=>`${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
     const dots=s.values.map((v,i)=>`<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3.5" fill="${s.color}"/>`).join("");
