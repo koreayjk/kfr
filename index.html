@@ -13,6 +13,12 @@ input, select, button { font-family: inherit; }
 :focus-visible { outline:2px solid #B5322E; outline-offset:2px; }
 input:focus, select:focus, textarea:focus { border-color:#B5322E; }
 .peso-field:focus-within { border-color:#B5322E; }
+/* 정렬용 숫자 모노 (시스템 폰트, 외부 로딩 없음; 한글은 Pretendard로 폴백) */
+.kpi-value,.kpi .delta,.num,.bar-val,.m-price,.m-sub,.rec-row b,.report-pl b,.ebar-val,.mng-price,.mng-price-input,.peso-field input,.stepper input,.promo-box,.prev-row,.data-table td { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Roboto Mono", "Pretendard", monospace; font-variant-numeric: tabular-nums; }
+/* GCash = 중립 정보(파랑) KPI 변형 */
+.kpi.accent-blue { background:linear-gradient(135deg,#2563EB,#1E40AF); border:none; }
+.kpi.accent-blue .kpi-label,.kpi.accent-blue .delta,.kpi.accent-blue .delta.up,.kpi.accent-blue .delta.down,.kpi.accent-blue .delta.flat { color:#C7D9F3; }
+.kpi.accent-blue .kpi-value { color:#fff; }
 .login-wrap { min-height:100vh; display:grid; place-items:center; padding:20px; }
 .login-card { background:#fff; border-radius:20px; padding:34px 30px; width:100%; max-width:390px; box-shadow:0 14px 40px rgba(110,60,30,.12); }
 .login-logo-img { width:100%; max-width:260px; display:block; margin:6px auto 18px; }
@@ -551,7 +557,7 @@ async function screenDashboard(){
     <div class="report-title">지점 현황 <span>· 회계연도 ${fy.label} (7월~다음해 6월 누적)</span></div>
     <div class="kpi-row">
       <div class="kpi"><div class="kpi-label">전 지점 매출</div><div class="kpi-value">${fmt(grand)}</div></div>
-      <div class="kpi accent"><div class="kpi-label">GCash 수입 (본사 계좌)</div><div class="kpi-value">${fmt(gcashTotal)}</div></div>
+      <div class="kpi accent-blue"><div class="kpi-label">GCash 수입 (본사 계좌)</div><div class="kpi-value">${fmt(gcashTotal)}</div></div>
       <div class="kpi"><div class="kpi-label">현금 수입 (지점 보유)</div><div class="kpi-value">${fmt(grand-gcashTotal)}</div></div>
     </div>
     <div class="grid-2">
@@ -668,7 +674,7 @@ function renderDaily(){
     <div class="kpi-row four">
       <div class="kpi"><div class="kpi-label">전 지점 합계</div><div class="kpi-value">${fmt(grand)}</div></div>
       <div class="kpi"><div class="kpi-label">현금 합계</div><div class="kpi-value">${fmt(cashGrand)}</div></div>
-      <div class="kpi accent"><div class="kpi-label">지케쉬(GCash) 합계</div><div class="kpi-value">${fmt(gcashGrand)}</div></div>
+      <div class="kpi accent-blue"><div class="kpi-label">지케쉬(GCash) 합계</div><div class="kpi-value">${fmt(gcashGrand)}</div></div>
       <div class="kpi"><div class="kpi-label">마감 일수</div><div class="kpi-value">${dayCount}일</div></div>
     </div>
     <div class="card">
