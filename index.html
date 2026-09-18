@@ -382,7 +382,7 @@ async function renderScreen() {
 }
 
 // ── 마감 입력 ───────────────────────────────────
-const closingDraft = { qty:{}, promo:{}, cash:"", gcash:"", deduct:"", date:"", editId:null, branchId:null, admin:false };
+const closingDraft = { qty:{}, promo:{}, cash:"", gcash:"", deduct:"", date:"", editId:null, branchId:null, admin:false, free:{} };
 const CAT_LABEL = { GENERAL:"일반 메뉴", SINGLE:"단품 메뉴" };
 function unitPrice(m){ const p=Number(closingDraft.promo[m.id]); return p>0?p:m.price; }
 async function screenClosing() {
@@ -410,6 +410,7 @@ async function screenClosing() {
         <span class="m-name">주문차감<em class="m-en">Order Deduction</em></span>
         <div class="peso-field" style="width:150px"><span>${PESO}</span><input id="deduct" type="number" inputmode="numeric" placeholder="0" value="${d.deduct}" oninput="onDeduct()" style="text-align:right"></div>
       </div>
+      ${freeSectionHTML()}
     </div>
     <div class="card sticky">
       <h2>${tl("income_verify")}</h2>
@@ -439,6 +440,28 @@ function stepQty(id,delta){const q=Math.max(0,(closingDraft.qty[id]||0)+delta);c
 function setPromo(id,v){closingDraft.promo[id]=v; const m=menuById(id),q=closingDraft.qty[id]||0; $("sub_"+id).textContent=q>0?fmt(q*unitPrice(m)):"—"; recalc();}
 function onPay(){closingDraft.cash=$("cash").value;closingDraft.gcash=$("gcash").value;recalc();}
 function onDeduct(){closingDraft.deduct=$("deduct").value;recalc();}
+// ── 쿠폰/무료 제공 (매출 0, 수량은 순위에 집계) ──
+function freeChipsHTML(){
+  const f=closingDraft.free||{}; const ids=Object.keys(f).filter(id=>f[id]>0);
+  if(!ids.length) return `<p class="hint" style="margin:6px 0 0">무료로 제공한 쿠폰 품목을 추가하세요. 매출은 0원, 수량만 판매 순위에 집계됩니다.</p>`;
+  return `<div style="margin-top:6px">`+ids.map(id=>`<span class="chip" style="margin:0 6px 6px 0;display:inline-block">${menuById(id)?.name||id} ×${f[id]} <b style="cursor:pointer;color:#B5322E;margin-left:2px" onclick="delFree('${id}')">✕</b></span>`).join("")+`</div>`;
+}
+function addFree(){ const s=$("freeSel"); if(!s)return; const id=s.value; const q=Math.max(1,Number($("freeQty").value)||1); if(!closingDraft.free)closingDraft.free={}; closingDraft.free[id]=(closingDraft.free[id]||0)+q; renderFreeList(); }
+function delFree(id){ if(closingDraft.free) delete closingDraft.free[id]; renderFreeList(); }
+function renderFreeList(){ const el=$("freeList"); if(el) el.innerHTML=freeChipsHTML(); }
+function freeSectionHTML(){
+  return `<div class="section-label">🎁 쿠폰 / 무료 제공</div>
+    <div class="add-form">
+      <select id="freeSel">${state.menus.map(m=>`<option value="${m.id}">${m.name}</option>`).join("")}</select>
+      <input id="freeQty" type="number" inputmode="numeric" value="1" min="1" style="width:64px;text-align:center">
+      <button class="btn-mini" onclick="addFree()">추가</button>
+    </div>
+    <div id="freeList">${freeChipsHTML()}</div>`;
+}
+function addFreeToRank(items, rank){
+  const f=(items&&items._free)||{};
+  Object.entries(f).forEach(([id,q])=>{ const o=rank[id]||(rank[id]={q:0,rev:0}); o.q+=Number(q)||0; });
+}
 function recalc(){
   const menuTotal=state.menus.reduce((s,m)=>s+(closingDraft.qty[m.id]||0)*unitPrice(m),0);
   const deduct=Number(closingDraft.deduct)||0;
@@ -457,13 +480,14 @@ async function loadClosingDate(date){
   closingDraft.date=date;
   const { data } = await sb.from("closings").select("id,items,cash,gcash").eq("branch_id",state.user.branchId).eq("date",date).order("id",{ascending:false}).limit(1);
   const rec = data && data[0];
-  closingDraft.qty={};closingDraft.promo={};closingDraft.deduct="";closingDraft.cash="";closingDraft.gcash="";closingDraft.editId=null;
+  closingDraft.qty={};closingDraft.promo={};closingDraft.deduct="";closingDraft.cash="";closingDraft.gcash="";closingDraft.editId=null;closingDraft.free={};
   if(rec){
     closingDraft.editId=rec.id;
     closingDraft.cash=rec.cash??"";
     closingDraft.gcash=rec.gcash??"";
     Object.entries(rec.items||{}).forEach(([id,v])=>{
       if(id==="_deduct"){ closingDraft.deduct=v; return; }
+      if(id==="_free"){ closingDraft.free=Object.assign({}, v||{}); return; }
       if(String(id).startsWith("_")) return;
       if(v && typeof v==="object"){ closingDraft.qty[id]=Number(v.q||0); if(v.p) closingDraft.promo[id]=v.p; }
       else closingDraft.qty[id]=Number(v||0);
@@ -475,6 +499,7 @@ async function saveClosing(){
   const items={};
   state.menus.forEach(m=>{ const q=closingDraft.qty[m.id]||0; if(q>0){ const pr=Number(closingDraft.promo[m.id]); items[m.id]= pr>0 ? {q, p:pr} : q; }});
   const deduct=Number(closingDraft.deduct)||0; if(deduct>0) items._deduct=deduct;
+  const free={}; Object.entries(closingDraft.free||{}).forEach(([id,q])=>{ if(Number(q)>0) free[id]=Number(q); }); if(Object.keys(free).length) items._free=free;
   $("saveBtn").disabled=true;
   const date=closingDraft.date||today();
   const payload={ branch_id: state.user.branchId, date, items, cash: Number(closingDraft.cash)||0, gcash: Number(closingDraft.gcash)||0 };
@@ -541,11 +566,13 @@ async function screenDashboard(){
   const grand=per.reduce((s,b)=>s+b.total,0), gcashTotal=per.reduce((s,b)=>s+b.gcash,0);
   const maxT=Math.max(...per.map(b=>b.total),1);
   const rank={}; cs.forEach(c=>Object.entries(c.items).filter(([id])=>!String(id).startsWith("_")).forEach(([id,v])=>{const o=rank[id]||(rank[id]={q:0,rev:0}); o.q+=itemQty(v); o.rev+=itemRev(v,menuById(id));}));
+  cs.forEach(c=>addFreeToRank(c.items, rank));
   const ranked=Object.entries(rank).map(([id,o])=>({name:menuById(id)?.name||id,q:o.q,rev:o.rev})).sort((a,b)=>b.rev-a.rev);
   // ── 호점별 메뉴 판매 순위 (같은 데이터로 분리) ──
   const perRank={};
   cs.forEach(c=>{ const br=perRank[c.branch_id]||(perRank[c.branch_id]={});
     Object.entries(c.items).filter(([id])=>!String(id).startsWith("_")).forEach(([id,v])=>{ const o=br[id]||(br[id]={q:0,rev:0}); o.q+=itemQty(v); o.rev+=itemRev(v,menuById(id)); }); });
+  cs.forEach(c=>{ const br=perRank[c.branch_id]||(perRank[c.branch_id]={}); addFreeToRank(c.items, br); });
   const branchCards=per.filter(b=>b.total>0||perRank[b.id]).sort((a,b)=>b.total-a.total).map(b=>{
     const list=Object.entries(perRank[b.id]||{}).map(([id,o])=>({name:menuById(id)?.name||id,q:o.q,rev:o.rev})).sort((x,y)=>y.rev-x.rev);
     const rows=list.length?list.map((m,i)=>`<tr><td style="color:#807460;width:28px">${i+1}</td><td>${m.name}</td><td class="num">${m.q}개</td><td class="num">${fmt(m.rev)}</td></tr>`).join(""):'<tr><td colspan="4" class="empty">판매 없음</td></tr>';
@@ -720,11 +747,12 @@ async function adminEditClosing(branchId, date){
   closingDraft.date=date;
   const { data }=await sb.from("closings").select("id,items,cash,gcash").eq("branch_id",closingDraft.branchId).eq("date",date).order("id",{ascending:false}).limit(1);
   const rec=data&&data[0];
-  closingDraft.qty={};closingDraft.promo={};closingDraft.deduct="";closingDraft.cash="";closingDraft.gcash="";closingDraft.editId=null;
+  closingDraft.qty={};closingDraft.promo={};closingDraft.deduct="";closingDraft.cash="";closingDraft.gcash="";closingDraft.editId=null;closingDraft.free={};
   if(rec){
     closingDraft.editId=rec.id; closingDraft.cash=rec.cash??""; closingDraft.gcash=rec.gcash??"";
     Object.entries(rec.items||{}).forEach(([id,v])=>{
       if(id==="_deduct"){ closingDraft.deduct=v; return; }
+      if(id==="_free"){ closingDraft.free=Object.assign({}, v||{}); return; }
       if(String(id).startsWith("_")) return;
       if(v && typeof v==="object"){ closingDraft.qty[id]=Number(v.q||0); if(v.p) closingDraft.promo[id]=v.p; }
       else closingDraft.qty[id]=Number(v||0);
@@ -748,6 +776,7 @@ function renderAdminEditor(){
         <span class="m-name">주문차감</span>
         <div class="peso-field" style="width:150px"><span>${PESO}</span><input id="deduct" type="number" inputmode="numeric" placeholder="0" value="${d.deduct}" oninput="onDeduct()" style="text-align:right"></div>
       </div>
+      ${freeSectionHTML()}
     </div>
     <div class="card sticky">
       <h2>수입 확인</h2>
@@ -769,6 +798,7 @@ async function saveAdminClosing(){
   const items={};
   state.menus.forEach(m=>{ const q=closingDraft.qty[m.id]||0; if(q>0){ const pr=Number(closingDraft.promo[m.id]); items[m.id]= pr>0 ? {q, p:pr} : q; }});
   const deduct=Number(closingDraft.deduct)||0; if(deduct>0) items._deduct=deduct;
+  const free={}; Object.entries(closingDraft.free||{}).forEach(([id,q])=>{ if(Number(q)>0) free[id]=Number(q); }); if(Object.keys(free).length) items._free=free;
   $("saveBtn").disabled=true;
   const payload={ branch_id: closingDraft.branchId, date: closingDraft.date, items, cash: Number(closingDraft.cash)||0, gcash: Number(closingDraft.gcash)||0 };
   const { error } = closingDraft.editId
@@ -799,6 +829,7 @@ async function fetchMenuRank(month,branchId,day){
   rows.forEach(c=>Object.entries(c.items||{}).filter(([id])=>!String(id).startsWith("_")).forEach(([id,v])=>{
     const o=rank[id]||(rank[id]={q:0,rev:0}); o.q+=itemQty(v); o.rev+=itemRev(v,menuById(id));
   }));
+  rows.forEach(c=>addFreeToRank(c.items, rank));
   const ranked=Object.entries(rank).map(([id,o])=>({name:menuById(id)?.name||id,q:o.q,rev:o.rev})).sort((a,b)=>b.rev-a.rev||b.q-a.q);
   const dayset=new Set(rows.map(c=>String(c.date).slice(0,10)));
   return {ranked, days:dayset.size, totalQ:ranked.reduce((s,r)=>s+r.q,0), totalRev:ranked.reduce((s,r)=>s+r.rev,0)};
