@@ -240,6 +240,9 @@ const I18N = {
   save_closing:{ko:"마감 저장",en:"Save Closing",tl:"I-save ang Closing"},
   closing_hint:{ko:"프로모 칸에 가격을 넣으면 그 가격으로 계산됩니다(비우면 기본가). 메뉴 합계와 현금+GCash가 맞아야 정상 마감이에요.",en:"Type a price in the Promo box to use that price (blank = base price). Menu total must match Cash + GCash. / Ang kabuuan ng menu ay dapat tumugma sa Cash + GCash."},
   prev_closing:{ko:"이전 마감",en:"Previous Closings",tl:"Nakaraang Closing"},
+  free_label:{ko:"쿠폰 / 무료 제공",en:"Coupon / Free item",tl:"Kupon / Libreng item"},
+  free_add:{ko:"추가",en:"Add",tl:"Idagdag"},
+  free_hint:{ko:"무료로 제공한 쿠폰 품목을 추가하세요. 매출은 0원, 수량만 판매 순위에 집계됩니다.",en:"Add items given free (coupon). Revenue is ₱0 — only the quantity counts in the sales ranking. / Idagdag ang mga libreng item (kupon). ₱0 ang kita; bilang lang ang kasama sa ranking."},
   saved_closing:{ko:"마감이 저장되었습니다",en:"Closing saved / Na-save ang closing"},
   save_fail:{ko:"저장 실패: ",en:"Save failed: "},
   order_title:{ko:"밀키트 주문",en:"Meal Kit Order",tl:"Order ng Meal Kit"},
@@ -443,18 +446,18 @@ function onDeduct(){closingDraft.deduct=$("deduct").value;recalc();}
 // ── 쿠폰/무료 제공 (매출 0, 수량은 순위에 집계) ──
 function freeChipsHTML(){
   const f=closingDraft.free||{}; const ids=Object.keys(f).filter(id=>f[id]>0);
-  if(!ids.length) return `<p class="hint" style="margin:6px 0 0">무료로 제공한 쿠폰 품목을 추가하세요. 매출은 0원, 수량만 판매 순위에 집계됩니다.</p>`;
+  if(!ids.length) return `<p class="hint" style="margin:6px 0 0">${tt("free_hint")}</p>`;
   return `<div style="margin-top:6px">`+ids.map(id=>`<span class="chip" style="margin:0 6px 6px 0;display:inline-block">${menuById(id)?.name||id} ×${f[id]} <b style="cursor:pointer;color:#B5322E;margin-left:2px" onclick="delFree('${id}')">✕</b></span>`).join("")+`</div>`;
 }
 function addFree(){ const s=$("freeSel"); if(!s)return; const id=s.value; const q=Math.max(1,Number($("freeQty").value)||1); if(!closingDraft.free)closingDraft.free={}; closingDraft.free[id]=(closingDraft.free[id]||0)+q; renderFreeList(); }
 function delFree(id){ if(closingDraft.free) delete closingDraft.free[id]; renderFreeList(); }
 function renderFreeList(){ const el=$("freeList"); if(el) el.innerHTML=freeChipsHTML(); }
 function freeSectionHTML(){
-  return `<div class="section-label">🎁 쿠폰 / 무료 제공</div>
+  return `<div class="section-label">🎁 ${tl("free_label")}</div>
     <div class="add-form">
       <select id="freeSel">${state.menus.map(m=>`<option value="${m.id}">${m.name}</option>`).join("")}</select>
       <input id="freeQty" type="number" inputmode="numeric" value="1" min="1" style="width:64px;text-align:center">
-      <button class="btn-mini" onclick="addFree()">추가</button>
+      <button class="btn-mini" onclick="addFree()">${tt("free_add")}</button>
     </div>
     <div id="freeList">${freeChipsHTML()}</div>`;
 }
