@@ -447,7 +447,7 @@ function onDeduct(){closingDraft.deduct=$("deduct").value;recalc();}
 function freeChipsHTML(){
   const f=closingDraft.free||{}; const ids=Object.keys(f).filter(id=>f[id]>0);
   if(!ids.length) return `<p class="hint" style="margin:6px 0 0">${tt("free_hint")}</p>`;
-  return `<div style="margin-top:6px">`+ids.map(id=>{const m=menuById(id);const nm=m?(state.lang==="ko"?m.name:(m.name_en||m.name)):id;return `<span class="chip" style="margin:0 6px 6px 0;display:inline-block">${nm} ×${f[id]} <b style="cursor:pointer;color:#B5322E;margin-left:2px" onclick="delFree('${id}')">✕</b></span>`;}).join("")+`</div>`;
+  return `<div style="margin-top:6px">`+ids.map(id=>{const m=menuById(id);const nm=m?(m.name_en?m.name+" · "+m.name_en:m.name):id;return `<span class="chip" style="margin:0 6px 6px 0;display:inline-block">${nm} ×${f[id]} <b style="cursor:pointer;color:#B5322E;margin-left:2px" onclick="delFree('${id}')">✕</b></span>`;}).join("")+`</div>`;
 }
 function addFree(){ const s=$("freeSel"); if(!s)return; const id=s.value; const q=Math.max(1,Number($("freeQty").value)||1); if(!closingDraft.free)closingDraft.free={}; closingDraft.free[id]=(closingDraft.free[id]||0)+q; renderFreeList(); }
 function delFree(id){ if(closingDraft.free) delete closingDraft.free[id]; renderFreeList(); }
@@ -455,7 +455,7 @@ function renderFreeList(){ const el=$("freeList"); if(el) el.innerHTML=freeChips
 function freeSectionHTML(){
   return `<div class="section-label">🎁 ${tl("free_label")}</div>
     <div class="add-form">
-      <select id="freeSel">${state.menus.map(m=>{const lbl=state.lang==="ko"?m.name:(m.name_en?m.name_en+" · "+m.name:m.name);return `<option value="${m.id}">${lbl}</option>`;}).join("")}</select>
+      <select id="freeSel">${state.menus.map(m=>{const lbl=m.name_en?m.name+" · "+m.name_en:m.name;return `<option value="${m.id}">${lbl}</option>`;}).join("")}</select>
       <input id="freeQty" type="number" inputmode="numeric" value="1" min="1" style="width:64px;text-align:center">
       <button class="btn-mini" onclick="addFree()">${tt("free_add")}</button>
     </div>
