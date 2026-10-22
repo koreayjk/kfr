@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>K-Food 통합 관리</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, "Pretendard", "Segoe UI", sans-serif; background:#F6F2EC; color:#1E1A17; -webkit-text-size-adjust:100%; }
@@ -180,6 +182,73 @@ input:focus, select:focus, textarea:focus { border-color:#B5322E; }
 .brn-row select, .brn-row input { border:1px solid #D8CDBD; border-radius:7px; padding:6px 8px; font-size:13px; width:100%; }
 .brn-name { font-weight:600; }
 .legend.multi { flex-wrap:wrap; gap:8px 16px; }
+/* ═══════════════════ Professional polish v2 ═══════════════════ */
+:root{ --brand:#B5322E; --line:#ECE4D6; --line-soft:#F2ECE0;
+  --shadow:0 1px 2px rgba(110,60,30,.04),0 8px 20px rgba(110,60,30,.06); }
+html{ scroll-behavior:smooth; }
+body{ font-family:"Pretendard Variable","Pretendard",-apple-system,"Segoe UI",system-ui,sans-serif; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; letter-spacing:-.01em; }
+::selection{ background:rgba(181,50,46,.16); }
+button,.tab,.logout,.btn-mini,.mng-del,.lang-toggle button,.btn-primary,.stepper button,.chip,.kpi,.card,input,select,.data-table tbody tr{ transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease,color .15s ease,transform .08s ease; }
+
+/* top bar + tabs */
+.topbar{ position:sticky; top:0; z-index:50; padding:12px 22px; border-bottom:1px solid var(--line); box-shadow:0 1px 0 rgba(0,0,0,.02),0 6px 18px rgba(110,60,30,.04); }
+.topbar-logo{ height:32px; }
+.logout:hover{ background:#FAF6EF; border-color:#CBBEA9; }
+.tabs{ padding:8px 22px 0; gap:4px; }
+.tab{ padding:11px 15px; border-radius:9px 9px 0 0; }
+.tab:hover{ color:#5E4A36; background:#FAF6EF; }
+.tab.on{ color:var(--brand); background:#FBF2F1; }
+
+/* page headers + cards */
+.content{ max-width:1120px; padding:22px; }
+.report-title{ font-size:20px; letter-spacing:-.02em; padding-bottom:12px; border-bottom:1px solid var(--line); }
+.report-title span{ font-size:13.5px; }
+.card{ border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); padding:22px; }
+.card h2{ font-size:15.5px; font-weight:700; letter-spacing:-.02em; }
+.card-head{ border-bottom:1px solid var(--line-soft); padding-bottom:12px; margin-bottom:16px; }
+
+/* KPI tiles */
+.kpi{ border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); padding:18px 20px; }
+.kpi-label{ text-transform:uppercase; letter-spacing:.07em; font-size:11px; font-weight:700; color:#8A7C6A; }
+.kpi-value{ font-size:26px; letter-spacing:-.02em; }
+.kpi.accent{ background:linear-gradient(140deg,#C2403A,#8E2420); box-shadow:0 10px 24px rgba(181,50,46,.22); }
+.kpi.accent-blue{ background:linear-gradient(140deg,#3B74F0,#1E40AF); box-shadow:0 10px 24px rgba(37,99,235,.20); }
+
+/* tables */
+.data-table th{ background:#FBF7F0; color:#8A7C6A; padding:10px 10px; }
+.data-table td{ padding:11px 10px; }
+.tscroll thead th{ background:#FBF7F0; box-shadow:inset 0 -1px 0 var(--line); }
+.data-table tbody tr:hover{ background:#FBF8F2; }
+.tscroll::-webkit-scrollbar{ width:10px; height:10px; }
+.tscroll::-webkit-scrollbar-thumb{ background:#D8CDBD; border-radius:8px; border:2px solid #fff; }
+.tscroll::-webkit-scrollbar-track{ background:transparent; }
+
+/* buttons */
+.btn-primary{ box-shadow:0 2px 10px rgba(181,50,46,.22); letter-spacing:-.01em; }
+.btn-primary:hover:not(:disabled){ background:#A12B27; box-shadow:0 4px 14px rgba(181,50,46,.28); }
+.btn-primary:active:not(:disabled){ transform:translateY(1px); }
+.btn-primary:disabled{ box-shadow:none; }
+.btn-mini:hover{ background:#FBF1F0; }
+.btn-mini:active{ transform:translateY(1px); }
+.mng-del:hover{ background:#FBF1F0; }
+.stepper button:hover{ background:#FAF6EF; border-color:#CBBEA9; }
+
+/* inputs focus ring */
+input:focus,select:focus,textarea:focus{ box-shadow:0 0 0 3px rgba(181,50,46,.12); }
+.peso-field:focus-within{ box-shadow:0 0 0 3px rgba(181,50,46,.12); }
+
+/* badges / status / chips */
+.badge{ padding:2px 8px; border-radius:6px; letter-spacing:.02em; }
+.status{ padding:4px 11px; }
+.chip{ border:1px solid #ECE1CF; }
+
+/* login */
+.login-wrap{ background:radial-gradient(1100px 460px at 50% -8%, #FBF4EA, #F2ECE0); }
+.login-card{ border:1px solid #F0E9DD; border-radius:22px; box-shadow:0 24px 70px rgba(110,60,30,.16); padding:38px 32px; }
+.login-card .sub{ letter-spacing:.14em; }
+
+@media (max-width:560px){ .content{ padding:16px; } .topbar{ padding:11px 16px; } .tabs{ padding-left:16px; padding-right:16px; } }
+@media (prefers-reduced-motion:reduce){ *{ transition:none!important; scroll-behavior:auto!important; } }
 </style>
 </head>
 <body>
