@@ -114,6 +114,13 @@ input:focus, select:focus, textarea:focus { border-color:#B5322E; }
 .s-CONFIRMED { background:#E8EEF6; color:#3A5A82; }
 .s-SHIPPING { background:#FBF1DC; color:#9A6A1E; }
 .s-DELIVERED { background:#E3F3E8; color:#1F7A43; }
+.s-APPROVED { background:#FBF1F0; color:#B5322E; }
+.badge.cafe { background:#F3E6DC; color:#7A4321; }
+.badge.rest { background:#E8EEF6; color:#3A5A82; }
+.dot-red { display:inline-block; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:#B5322E; color:#fff; font-size:11px; font-weight:700; line-height:18px; text-align:center; margin-left:5px; vertical-align:1px; }
+.sup-steps { display:flex; gap:4px; margin:4px 0 10px; }
+.sup-steps span { flex:1; height:5px; border-radius:3px; background:#F0E9DD; }
+.sup-steps span.on { background:#1F7A43; }
 .btn-mini { border:1px solid #B5322E; color:#B5322E; background:#fff; border-radius:8px; padding:9px 12px; font-size:12px; font-weight:700; cursor:pointer; }
 .done-mark { color:#1F7A43; font-weight:700; font-size:13px; }
 .mode-pick { margin:14px 0; }
@@ -356,7 +363,7 @@ function logout() { state.user = null; renderLogin(); }
 function renderApp() {
   const u = state.user, hq = u.branchId === 0;
   const tabs = hq
-    ? [["dashboard","지점 현황"],["settle","가맹점 정산"],["orders","밀키트 관리"],["payouts","지급 장부"],["daily","일별 매출"],["menurank","메뉴 순위"],["report","월별 보고서"],["manage","관리"]]
+    ? [["dashboard","지점 현황"],["settle","가맹점 정산"],["orders","밀키트 관리"],["supply","☕ 공급요청"],["payouts","지급 장부"],["daily","일별 매출"],["menurank","메뉴 순위"],["report","월별 보고서"],["manage","관리"]]
     : [["closing",tt("tab_closing")],["myorder",tt("tab_order")]];
   const role = hq ? "전체 관리" : (u.type==="DIRECT"?tt("direct_branch"):tt("franchise_branch"));
   $("root").innerHTML = `
@@ -365,9 +372,10 @@ function renderApp() {
       <div class="who">${hq?"":`<div class="lang-toggle">${langButtons()}</div>`}<div class="who-name">${hq?"본사 관리자":u.name}<small>${role}</small></div>
       <button class="logout" onclick="logout()">${hq?"로그아웃":tt("logout")}</button></div>
     </div>
-    <div class="tabs">${tabs.map(([k,l])=>`<button class="tab ${state.tab===k?'on':''}" onclick="go('${k}')">${l}</button>`).join("")}</div>
+    <div class="tabs">${tabs.map(([k,l])=>`<button id="tab_${k}" class="tab ${state.tab===k?'on':''}" onclick="go('${k}')">${l}</button>`).join("")}</div>
     <div class="content" id="screen"><div class="loading">${hq?"불러오는 중…":tt("loading")}</div></div>`;
   renderScreen();
+  if (hq) refreshSupplyBadge();
 }
 function go(t) { state.tab = t; renderApp(); }
 async function renderScreen() {
@@ -377,6 +385,7 @@ async function renderScreen() {
   if (t === "dashboard") return screenDashboard();
   if (t === "settle") return screenSettle();
   if (t === "orders") return screenOrders();
+  if (t === "supply") return screenSupply();
   if (t === "payouts") return screenPayouts();
   if (t === "daily") return screenDaily();
   if (t === "menurank") return screenMenuRank();
@@ -949,6 +958,57 @@ async function screenOrders(){
     ${cards||'<p class="empty">주문이 없습니다.</p>'}
     ${pErr?`<div class="setup-note" style="margin-top:12px">⚠️ '지급 장부' 테이블이 아직 없습니다. <b>supabase/payouts_table.sql</b> 을 Supabase에서 실행하면 지급 수락·장부 기능이 켜집니다.</div>`:""}`;
 }
+// ── ☕ 공급요청 (Bahay Cafe 등 → kfr.supply_requests) ───────────
+//  카페 사장이 승인(APPROVED)한 요청부터 여기에 나타남.
+//  상태 흐름/시각은 DB 트리거(kcafe/supabase/05_kfood_link.sql)가 강제.
+const SUP_FLOW = ["APPROVED","CONFIRMED","SHIPPING","DELIVERED"];
+const SUP_LABEL = { APPROVED:"신규(승인됨)", CONFIRMED:"주문 확인", SHIPPING:"배송중", DELIVERED:"배송완료" };
+const SUP_NEXT_BTN = { APPROVED:"주문 확인", CONFIRMED:"배송 시작", SHIPPING:"배송 완료" };
+const SUP_SOURCE = { CAFE:["cafe","☕ 카페"], REST:["rest","🍜 호점"] };
+const supQty = (n) => { const v=Number(n)||0; return Number.isInteger(v)?String(v):String(+v.toFixed(2)); };
+const supEsc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+async function refreshSupplyBadge(){
+  const { count, error } = await sb.from("supply_requests").select("id",{count:"exact",head:true}).eq("status","APPROVED");
+  const tab = $("tab_supply"); if (!tab || error) return;
+  tab.querySelector(".dot-red")?.remove();
+  if (count) tab.insertAdjacentHTML("beforeend", `<span class="dot-red">${count}</span>`);
+}
+async function screenSupply(){
+  const since = new Date(Date.now() - 30*864e5).toISOString();
+  const [open, done] = await Promise.all([
+    sb.from("supply_requests").select("*").in("status",["APPROVED","CONFIRMED","SHIPPING"]).order("id",{ascending:true}),
+    sb.from("supply_requests").select("*").eq("status","DELIVERED").gte("status_at",since).order("status_at",{ascending:false}).limit(30),
+  ]);
+  if (open.error) { $("screen").innerHTML = `<div class="setup-note">⚠️ 공급요청 테이블을 읽지 못했어요. kcafe 저장소의 <b>supabase/05_kfood_link.sql</b>까지 실행했는지 확인해주세요.<br><br>오류: ${supEsc(open.error.message)}</div>`; return; }
+  const card = (r) => {
+    const i = SUP_FLOW.indexOf(r.status), src = SUP_SOURCE[r.source] || ["rest", supEsc(r.source)];
+    const next = SUP_FLOW[i+1], prev = i > 0 ? SUP_FLOW[i-1] : null;
+    const when = (ts) => ts ? new Date(ts).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "";
+    return `<div class="order-card">
+      <div class="order-top"><span><span class="badge ${src[0]}">${src[1]}</span> <b>${supEsc(r.requested_by||"")}</b> <span class="muted">${r.date}</span></span><span class="status s-${r.status}">${SUP_LABEL[r.status]||r.status}</span></div>
+      <div class="sup-steps">${SUP_FLOW.map((_,k)=>`<span class="${k<=i?"on":""}"></span>`).join("")}</div>
+      <div class="order-items">${(r.items||[]).map((it)=>`<span class="chip">${supEsc(it.name)} ×${supQty(it.qty)}${supEsc(it.unit||"")}</span>`).join("")}</div>
+      ${r.note ? `<div class="muted" style="white-space:pre-wrap;margin-bottom:8px">${supEsc(r.note)}</div>` : ""}
+      <div class="order-foot"><span class="muted">${r.approved_by?`승인: ${supEsc(r.approved_by)} · `:""}${when(r.status_at)}${r.received_at?" · ✅ 카페 입고완료":""}</span>
+        <span style="display:flex;gap:6px">${prev && !r.received_at ? `<button class="btn-mini" style="border-color:#D8CDBD;color:#5E4A36" onclick="advanceSupply(${r.id},'${r.status}','${prev}')">↶ 되돌리기</button>` : ""}
+        ${next ? `<button class="btn-mini" onclick="advanceSupply(${r.id},'${r.status}','${next}')">${SUP_NEXT_BTN[r.status]} →</button>` : ""}</span></div>
+    </div>`;
+  };
+  const rows = open.data || [], neu = rows.filter((r)=>r.status==="APPROVED"), going = rows.filter((r)=>r.status!=="APPROVED");
+  $("screen").innerHTML = `<div class="report-title">☕ 공급요청 <span>· 카페 사장 승인 완료 건</span></div>
+    <div class="card"><div class="card-head"><h2>신규 ${neu.length?`<span class="dot-red">${neu.length}</span>`:""}</h2></div>${neu.map(card).join("") || '<p class="empty">새 요청이 없습니다.</p>'}</div>
+    <div class="card"><div class="card-head"><h2>진행 중</h2></div>${going.map(card).join("") || '<p class="empty">진행 중인 요청이 없습니다.</p>'}</div>
+    <div class="card"><div class="card-head"><h2>배송완료</h2><span class="muted">최근 30일</span></div>${(done.data||[]).map(card).join("") || '<p class="empty">—</p>'}</div>
+    <p class="hint">상태는 카페 앱에도 바로 반영됩니다. 실수로 넘겼다면 '되돌리기'로 한 단계 되돌릴 수 있어요(카페에서 입고 처리한 건은 제외).</p>`;
+}
+async function advanceSupply(id, from, to){
+  if (to === "DELIVERED" && !confirm("배송 완료로 처리할까요? 카페에서 입고 처리를 하게 됩니다.")) return;
+  const { data, error } = await sb.from("supply_requests").update({ status: to }).eq("id", id).eq("status", from).select("id");
+  if (error) { toast("변경 실패: " + error.message); return; }
+  if (!data?.length) toast("다른 곳에서 이미 변경되었습니다");
+  screenSupply(); refreshSupplyBadge();
+}
+
 async function advanceOrder(id,next){
   const { error } = await sb.from("kit_orders").update({status:next}).eq("id",id);
   if(error){toast("변경 실패: "+error.message);return;} screenOrders();
