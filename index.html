@@ -241,6 +241,11 @@ input:focus,select:focus,textarea:focus{ box-shadow:0 0 0 3px rgba(181,50,46,.12
 .badge{ padding:2px 8px; border-radius:6px; letter-spacing:.02em; }
 .status{ padding:4px 11px; }
 .chip{ border:1px solid #ECE1CF; }
+.btn-mini{ min-height:40px; display:inline-flex; align-items:center; justify-content:center; }
+.chip-x{ border:none; background:#FBE4E3; color:#B5322E; font-weight:800; width:22px; height:22px; min-width:22px; border-radius:50%; cursor:pointer; margin-left:6px; line-height:1; padding:0; font-size:12px; }
+.chip-x:hover{ background:#F6C9C6; }
+.td-act{ cursor:pointer; }
+.td-act:hover{ background:#FBF8F2; }
 
 /* login */
 .login-wrap{ background:radial-gradient(1100px 460px at 50% -8%, #FBF4EA, #F2ECE0); }
@@ -505,27 +510,29 @@ async function screenClosing() {
       </div>
       <button class="btn-primary" id="saveBtn" disabled onclick="saveClosing()">${d.editId?(state.lang==="ko"?"수정 저장":"Update"):tl("save_closing")}</button>
       <p class="hint">${tt("closing_hint")}</p>
-      ${prev&&prev.length?`<div class="section-label">${tl("prev_closing")}</div>${prev.map(p=>{const pd=String(p.date).slice(0,10);return `<div class="prev-row" style="cursor:pointer${pd===d.date?';background:#FBF1F0;border-radius:8px':''}" onclick="loadClosingDate('${pd}')"><span>${p.date}</span><b>${fmt(p.cash+p.gcash)}</b></div>`;}).join("")}<p class="hint">${state.lang==="ko"?"날짜를 누르면 그날 마감을 불러와 수정합니다.":"Tap a date to load & edit that day."}</p>`:""}
+      ${prev&&prev.length?`<div class="section-label">${tl("prev_closing")}</div>${prev.map(p=>{const pd=String(p.date).slice(0,10);return `<div class="prev-row" style="cursor:pointer${pd===d.date?';background:#FBF1F0;border-radius:8px':''}" role="button" tabindex="0" onclick="loadClosingDate('${pd}')" onkeydown="keyActivate(event)" aria-label="${p.date} 마감 불러오기"><span>${p.date}</span><b>${fmt(p.cash+p.gcash)}</b></div>`;}).join("")}<p class="hint">${state.lang==="ko"?"날짜를 누르면 그날 마감을 불러와 수정합니다.":"Tap a date to load & edit that day."}</p>`:""}
     </div></div>`;
   recalc();
 }
 function menuRowHTML(m){const q=closingDraft.qty[m.id]||0;return `<div class="menu-row promo-row">
   <span class="m-name">${m.name}${m.name_en?`<em class="m-en">${m.name_en}</em>`:""}</span><span class="m-price">${fmt(m.price)}</span>
   <div class="stepper"><button onclick="stepQty('${m.id}',-1)">−</button>
-  <input type="number" inputmode="numeric" id="q_${m.id}" value="${q||''}" placeholder="0" oninput="setQty('${m.id}',this.value)">
+  <input type="number" inputmode="numeric" id="q_${m.id}" value="${q||''}" placeholder="0" oninput="setQty('${m.id}',this.value)" aria-label="${m.name} 수량">
   <button onclick="stepQty('${m.id}',1)">+</button></div>
-  <input class="promo-box" type="number" inputmode="numeric" id="p_${m.id}" value="${closingDraft.promo[m.id]||''}" placeholder="${m.price}" oninput="setPromo('${m.id}',this.value)">
+  <input class="promo-box" type="number" inputmode="numeric" id="p_${m.id}" value="${closingDraft.promo[m.id]||''}" placeholder="${m.price}" oninput="setPromo('${m.id}',this.value)" aria-label="${m.name} 프로모 가격">
   <span class="m-sub" id="sub_${m.id}">${q>0?fmt(q*unitPrice(m)):"—"}</span></div>`;}
 function setQty(id,v){closingDraft.qty[id]=Number(v)||0; const m=menuById(id); $("sub_"+id).textContent=closingDraft.qty[id]>0?fmt(closingDraft.qty[id]*unitPrice(m)):"—"; recalc();}
 function stepQty(id,delta){const q=Math.max(0,(closingDraft.qty[id]||0)+delta);closingDraft.qty[id]=q;$("q_"+id).value=q||"";const m=menuById(id);$("sub_"+id).textContent=q>0?fmt(q*unitPrice(m)):"—";recalc();}
 function setPromo(id,v){closingDraft.promo[id]=v; const m=menuById(id),q=closingDraft.qty[id]||0; $("sub_"+id).textContent=q>0?fmt(q*unitPrice(m)):"—"; recalc();}
 function onPay(){closingDraft.cash=$("cash").value;closingDraft.gcash=$("gcash").value;recalc();}
 function onDeduct(){closingDraft.deduct=$("deduct").value;recalc();}
+// 클릭 전용 요소를 키보드(Enter/Space)로도 활성화 — 접근성
+function keyActivate(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); e.currentTarget.click(); } }
 // ── 쿠폰/무료 제공 (매출 0, 수량은 순위에 집계) ──
 function freeChipsHTML(){
   const f=closingDraft.free||{}; const ids=Object.keys(f).filter(id=>f[id]>0);
   if(!ids.length) return `<p class="hint" style="margin:6px 0 0">${tt("free_hint")}</p>`;
-  return `<div style="margin-top:6px">`+ids.map(id=>{const m=menuById(id);const nm=m?(m.name_en?m.name+" · "+m.name_en:m.name):id;return `<span class="chip" style="margin:0 6px 6px 0;display:inline-block">${nm} ×${f[id]} <b style="cursor:pointer;color:#B5322E;margin-left:2px" onclick="delFree('${id}')">✕</b></span>`;}).join("")+`</div>`;
+  return `<div style="margin-top:6px">`+ids.map(id=>{const m=menuById(id);const nm=m?(m.name_en?m.name+" · "+m.name_en:m.name):id;return `<span class="chip" style="margin:0 6px 6px 0;display:inline-block">${nm} ×${f[id]} <button type="button" class="chip-x" aria-label="${nm} 삭제" onclick="delFree('${id}')">✕</button></span>`;}).join("")+`</div>`;
 }
 function addFree(){ const s=$("freeSel"); if(!s)return; const id=s.value; const q=Math.max(1,Number($("freeQty").value)||1); if(!closingDraft.free)closingDraft.free={}; closingDraft.free[id]=(closingDraft.free[id]||0)+q; renderFreeList(); }
 function delFree(id){ if(closingDraft.free) delete closingDraft.free[id]; renderFreeList(); }
@@ -533,8 +540,8 @@ function renderFreeList(){ const el=$("freeList"); if(el) el.innerHTML=freeChips
 function freeSectionHTML(){
   return `<div class="section-label">🎁 ${tl("free_label")}</div>
     <div class="add-form">
-      <select id="freeSel">${state.menus.map(m=>{const lbl=m.name_en?m.name+" · "+m.name_en:m.name;return `<option value="${m.id}">${lbl}</option>`;}).join("")}</select>
-      <input id="freeQty" type="number" inputmode="numeric" value="1" min="1" style="width:64px;text-align:center">
+      <select id="freeSel" aria-label="무료 제공 품목">${state.menus.map(m=>{const lbl=m.name_en?m.name+" · "+m.name_en:m.name;return `<option value="${m.id}">${lbl}</option>`;}).join("")}</select>
+      <input id="freeQty" type="number" inputmode="numeric" value="1" min="1" style="width:64px;text-align:center" aria-label="무료 제공 수량">
       <button class="btn-mini" onclick="addFree()">${tt("free_add")}</button>
     </div>
     <div id="freeList">${freeChipsHTML()}</div>`;
@@ -728,7 +735,7 @@ function renderDaily(){
     const cells=bs.map(b=>{
       const cell=byDate[d][b.id]; const v=dCell(cell); branchTot[b.id]+=v; dayTot+=v;
       if(cell){ cashGrand+=Number(cell.c||0); gcashGrand+=Number(cell.g||0); }
-      return `<td class="num" style="cursor:pointer${v?"":";color:#C9BFAE"}" onclick="adminEditClosing('${b.id}','${d}')" title="클릭하면 메뉴 수량까지 수정">${v?fmt(v):"–"}</td>`;
+      return `<td class="num td-act" style="${v?"":"color:#C9BFAE"}" role="button" tabindex="0" onclick="adminEditClosing('${b.id}','${d}')" onkeydown="keyActivate(event)" aria-label="${b.name} ${d} 매출 수정" title="클릭하면 메뉴 수량까지 수정">${v?fmt(v):"–"}</td>`;
     }).join("");
     grand+=dayTot;
     const wd=weekdayKo(d), wc=wd==="일"?"#B5322E":wd==="토"?"#3A5A82":"#807460";
@@ -1140,11 +1147,11 @@ async function screenPayouts(){
     const sub=list.reduce((s,p)=>s+poLine(p),0), subPaid=list.filter(p=>p.paid).reduce((s,p)=>s+poLine(p),0);
     const trs=list.map(p=>`<tr>
       <td>${p.item||''}</td>
-      <td class="num"><div class="peso-field" style="width:96px;display:inline-flex"><span>${PESO}</span><input type="number" value="${p.unit_price??0}" onchange="updatePayout(${p.id},'unit_price',this.value)" style="text-align:right;width:100%"></div></td>
+      <td class="num"><div class="peso-field" style="width:96px;display:inline-flex"><span>${PESO}</span><input type="number" value="${p.unit_price??0}" onchange="updatePayout(${p.id},'unit_price',this.value)" aria-label="${p.item||'품목'} 단가" style="text-align:right;width:100%"></div></td>
       <td class="num">${p.qty}</td>
       <td style="text-align:center" id="popaid_${p.id}">${paidBtnHTML(p.id,p.paid)}</td>
       <td class="num"><b id="poline_${p.id}">${fmt(poLine(p))}</b></td>
-      <td><input type="text" value="${String(p.note||'').replace(/"/g,'&quot;')}" placeholder="비고" onchange="updatePayout(${p.id},'note',this.value)" style="width:120px;border:1px solid #D8CDBD;border-radius:7px;padding:6px"></td>
+      <td><input type="text" value="${String(p.note||'').replace(/"/g,'&quot;')}" placeholder="비고" onchange="updatePayout(${p.id},'note',this.value)" aria-label="${p.item||'품목'} 비고" style="width:120px;border:1px solid #D8CDBD;border-radius:7px;padding:6px"></td>
       <td><button class="mng-del" onclick="delPayout(${p.id})">삭제</button></td>
     </tr>`).join("");
     return `<div class="card">${head}
