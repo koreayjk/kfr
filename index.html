@@ -252,6 +252,44 @@ input:focus,select:focus,textarea:focus{ box-shadow:0 0 0 3px rgba(181,50,46,.12
 .login-card{ border:1px solid #F0E9DD; border-radius:22px; box-shadow:0 24px 70px rgba(110,60,30,.16); padding:38px 32px; }
 .login-card .sub{ letter-spacing:.14em; }
 
+/* 자료실 (Resource Library) */
+.lib-catbar{ display:flex; gap:8px; flex-wrap:wrap; margin:4px 0 18px; }
+.lib-cat{ border:1px solid var(--line); background:#fff; border-radius:999px; padding:8px 16px; font-weight:700; color:#6b5b47; cursor:pointer; min-height:40px; font-size:14px; }
+.lib-cat:hover{ background:#FBF8F2; }
+.lib-cat.on{ background:var(--brand); border-color:var(--brand); color:#fff; }
+.lib-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:16px; }
+.lib-card{ border:1px solid var(--line); border-radius:16px; background:#fff; overflow:hidden; cursor:pointer; box-shadow:var(--shadow); display:flex; flex-direction:column; }
+.lib-card:hover{ transform:translateY(-2px); box-shadow:0 10px 26px rgba(110,60,30,.12); }
+.lib-thumb{ aspect-ratio:16/10; background:#F4EEE3 center/cover no-repeat; display:flex; align-items:center; justify-content:center; font-size:38px; position:relative; }
+.lib-thumb .play{ position:absolute; width:52px; height:52px; border-radius:50%; background:rgba(0,0,0,.55); color:#fff; display:flex; align-items:center; justify-content:center; font-size:22px; }
+.lib-tag{ position:absolute; top:10px; left:10px; background:rgba(255,255,255,.92); border-radius:8px; padding:3px 9px; font-size:12px; font-weight:800; color:var(--brand); }
+.lib-body{ padding:12px 14px; flex:1; display:flex; flex-direction:column; gap:5px; }
+.lib-body h3{ margin:0; font-size:15px; font-weight:800; color:#3a2d1e; line-height:1.35; }
+.lib-body .ex{ font-size:13px; color:#8a7b66; line-height:1.5; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.lib-body .meta{ margin-top:auto; font-size:12px; color:#a99a84; display:flex; justify-content:space-between; gap:8px; }
+.lib-media-count{ font-weight:700; color:#b08a3a; }
+/* detail */
+.lib-detail .lib-dtop{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:6px; }
+.lib-detail h2{ margin:4px 0; font-size:22px; color:#2c2115; }
+.lib-detail .lib-dmeta{ color:#a99a84; font-size:13px; margin-bottom:16px; }
+.lib-detail .lib-text{ white-space:pre-wrap; line-height:1.7; color:#3a2d1e; font-size:15px; margin-bottom:18px; }
+.lib-gallery{ display:flex; flex-direction:column; gap:14px; }
+.lib-gallery img{ width:100%; border-radius:14px; border:1px solid var(--line); }
+.lib-gallery video{ width:100%; border-radius:14px; background:#000; }
+.lib-embed{ position:relative; width:100%; aspect-ratio:16/9; border-radius:14px; overflow:hidden; border:1px solid var(--line); }
+.lib-embed iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; }
+.lib-linkcard{ display:flex; align-items:center; gap:10px; border:1px solid var(--line); border-radius:12px; padding:12px 14px; color:var(--brand); font-weight:700; text-decoration:none; background:#FBF8F2; }
+/* composer */
+.lib-form .field{ margin-bottom:14px; }
+.lib-form label{ display:block; font-weight:700; color:#5E4A36; margin-bottom:6px; font-size:14px; }
+.lib-form input[type=text], .lib-form textarea, .lib-form select{ width:100%; border:1px solid var(--line); border-radius:12px; padding:11px 13px; font:inherit; }
+.lib-form textarea{ min-height:120px; resize:vertical; line-height:1.6; }
+.lib-catsel{ display:flex; gap:8px; flex-wrap:wrap; }
+.lib-attach-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:10px; margin-top:10px; }
+.lib-att{ position:relative; border:1px solid var(--line); border-radius:12px; overflow:hidden; aspect-ratio:1; background:#F4EEE3 center/cover no-repeat; display:flex; align-items:center; justify-content:center; font-size:30px; color:#9a8a72; }
+.lib-att .rm{ position:absolute; top:4px; right:4px; width:24px; height:24px; border-radius:50%; border:none; background:rgba(0,0,0,.6); color:#fff; cursor:pointer; font-weight:800; line-height:1; }
+.lib-addrow{ display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; }
+.lib-addrow .btn-mini{ border:1px dashed #c9b89c; color:#6b5b47; background:#fff; padding:0 16px; }
 @media (max-width:560px){ .content{ padding:16px; } .topbar{ padding:11px 16px; } .tabs{ padding-left:16px; padding-right:16px; } }
 @media (prefers-reduced-motion:reduce){ *{ transition:none!important; scroll-behavior:auto!important; } }
 </style>
@@ -303,6 +341,7 @@ const I18N = {
   err_bad_pin:{ko:"PIN이 올바르지 않습니다.",en:"Incorrect PIN / Maling PIN."},
   tab_closing:{ko:"마감 입력",en:"Daily Closing"},
   tab_order:{ko:"밀키트 주문",en:"Meal Kit Order"},
+  tab_library:{ko:"자료실",en:"Resources"},
   closing_title:{ko:"일일 마감",en:"Daily Closing",tl:"Araw-araw na Closing"},
   h_menu:{ko:"메뉴",en:"Menu",tl:"Menu"},
   h_price:{ko:"기본가",en:"Price",tl:"Presyo"},
@@ -437,8 +476,8 @@ function logout() { state.user = null; renderLogin(); }
 function renderApp() {
   const u = state.user, hq = u.branchId === 0;
   const tabs = hq
-    ? [["dashboard","지점 현황"],["settle","가맹점 정산"],["orders","밀키트 관리"],["supply","☕ 공급요청"],["payouts","지급 장부"],["daily","일별 매출"],["menurank","메뉴 순위"],["report","월별 보고서"],["manage","관리"]]
-    : [["closing",tt("tab_closing")],["myorder",tt("tab_order")]];
+    ? [["dashboard","지점 현황"],["settle","가맹점 정산"],["orders","밀키트 관리"],["supply","☕ 공급요청"],["payouts","지급 장부"],["daily","일별 매출"],["menurank","메뉴 순위"],["report","월별 보고서"],["library","자료실"],["manage","관리"]]
+    : [["closing",tt("tab_closing")],["myorder",tt("tab_order")],["library",tt("tab_library")]];
   const role = hq ? "전체 관리" : (u.type==="DIRECT"?tt("direct_branch"):tt("franchise_branch"));
   $("root").innerHTML = `
     <div class="topbar">
@@ -464,6 +503,7 @@ async function renderScreen() {
   if (t === "daily") return screenDaily();
   if (t === "menurank") return screenMenuRank();
   if (t === "report") return screenReport();
+  if (t === "library") return screenLibrary();
   if (t === "manage") return screenManage();
 }
 
@@ -1510,6 +1550,199 @@ async function delExpense(id){
   const { error } = await sb.from("expenses").delete().eq("id",id);
   if(error){toast("삭제 실패: "+error.message);return;}
   screenManage();
+}
+
+// ── 자료실 (Resource Library / 지식 아카이브) ────────────
+//  홍보 · 메뉴 · 레시피 · 기타 자료를 사진/영상과 함께 쌓아두는 공용 게시판.
+//  관리자·호점 모두 보고, 글을 올릴 수 있습니다. (회사 기록으로 누적)
+const LIB_CATS = ["홍보","메뉴","레시피","기타"];
+const LIB_ICON = { "홍보":"📣","메뉴":"🍽️","레시피":"🎬","기타":"📌" };
+const libDraft = { id:null, category:"레시피", media:[] };
+
+function ytId(u){
+  const m = String(u).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/))([A-Za-z0-9_-]{6,})/);
+  return m ? m[1] : null;
+}
+function driveEmbed(u){
+  const m = String(u).match(/drive\.google\.com\/file\/d\/([A-Za-z0-9_-]+)/);
+  return m ? `https://drive.google.com/file/d/${m[1]}/preview` : null;
+}
+
+async function screenLibrary(){
+  $("screen").innerHTML = `<div class="loading">불러오는 중…</div>`;
+  const { data, error } = await sb.from("library").select("*").order("id",{ascending:false});
+  if(error){
+    $("screen").innerHTML = `<div class="card"><h2>자료실</h2><div class="setup-note">아직 '자료실'이 준비되지 않았어요.<br>Supabase SQL Editor에서 <b>supabase/library_table.sql</b> 을 실행하고, Storage에 <b>library</b> 공개 버킷을 만들어 주세요(파일 안내 포함).<br><br>오류: ${supEsc(error.message)}</div></div>`;
+    return;
+  }
+  state._libRows = data || [];
+  if(!state._libCat) state._libCat = "ALL";
+  libRenderList();
+}
+function libFilter(c){ state._libCat = c; libRenderList(); }
+
+function libRenderList(){
+  const cat = state._libCat || "ALL";
+  const rows = (state._libRows||[]).filter(r => cat==="ALL" || r.category===cat);
+  const catBtn = (c,label) => `<button class="lib-cat ${cat===c?'on':''}" onclick="libFilter('${c}')">${label}</button>`;
+  const cards = rows.map(libCardHTML).join("") || `<p class="empty" style="grid-column:1/-1">아직 등록된 자료가 없습니다. 위의 ‘＋ 새 글’로 첫 자료를 올려보세요.</p>`;
+  $("screen").innerHTML = `
+    <div class="report-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <div>📚 자료실 <span>· 홍보 · 메뉴 · 레시피 자료 모음</span></div>
+      <button class="btn-primary" style="width:auto;padding:10px 20px" onclick="libCompose()">＋ 새 글</button>
+    </div>
+    <div class="lib-catbar">${catBtn("ALL","전체")}${LIB_CATS.map(c=>catBtn(c, LIB_ICON[c]+" "+c)).join("")}</div>
+    <div class="lib-grid">${cards}</div>`;
+}
+function libCardHTML(r){
+  const media = Array.isArray(r.media)?r.media:[];
+  const firstImg = media.find(m=>m.t==="img");
+  const hasVid = media.some(m=>m.t!=="img");
+  const thumbStyle = firstImg ? `style="background-image:url('${supEsc(firstImg.url)}')"` : "";
+  const inner = firstImg ? (hasVid?`<span class="play">▶</span>`:"") : (hasVid?`<span class="play">▶</span>`:(LIB_ICON[r.category]||"📄"));
+  const when = r.created_at ? new Date(r.created_at).toLocaleDateString("ko-KR",{year:"2-digit",month:"numeric",day:"numeric"}) : "";
+  return `<div class="lib-card" onclick="libView(${r.id})" tabindex="0" role="button" onkeydown="keyActivate(event)" aria-label="${supEsc(r.title)} 보기">
+    <div class="lib-thumb" ${thumbStyle}><span class="lib-tag">${LIB_ICON[r.category]||""} ${supEsc(r.category)}</span>${inner}</div>
+    <div class="lib-body">
+      <h3>${supEsc(r.title)}</h3>
+      ${r.body?`<div class="ex">${supEsc(r.body)}</div>`:""}
+      <div class="meta"><span>${supEsc(r.author||"")}</span><span>${media.length?`<span class="lib-media-count">📎${media.length}</span> · `:""}${when}</span></div>
+    </div></div>`;
+}
+function libMediaHTML(m){
+  if(m.t==="img") return `<img src="${supEsc(m.url)}" loading="lazy" alt="">`;
+  if(m.t==="vid") return `<video controls preload="metadata" src="${supEsc(m.url)}"></video>`;
+  if(m.t==="yt")  return `<div class="lib-embed"><iframe src="https://www.youtube.com/embed/${supEsc(m.id)}" allowfullscreen allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>`;
+  if(m.t==="drive") return `<div class="lib-embed"><iframe src="${supEsc(m.url)}" allowfullscreen></iframe></div>`;
+  return `<a class="lib-linkcard" href="${supEsc(m.url)}" target="_blank" rel="noopener">🔗 ${supEsc(m.name||m.url)}</a>`;
+}
+function libView(id){
+  const r = (state._libRows||[]).find(x=>String(x.id)===String(id));
+  if(!r){ screenLibrary(); return; }
+  const media = Array.isArray(r.media)?r.media:[];
+  const u = state.user, canEdit = u.branchId===0 || String(r.author_id)===String(u.branchId);
+  const when = r.created_at ? new Date(r.created_at).toLocaleString("ko-KR",{year:"numeric",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "";
+  $("screen").innerHTML = `<div class="lib-detail">
+    <button class="btn-mini" style="border-color:#D8CDBD;color:#5E4A36;margin-bottom:14px" onclick="libRenderList()">← 목록</button>
+    <div class="card" style="padding:22px 24px">
+      <div class="lib-dtop">
+        <span class="lib-tag" style="position:static;background:#FBE9E8">${LIB_ICON[r.category]||""} ${supEsc(r.category)}</span>
+        ${canEdit?`<span style="display:flex;gap:6px">
+          <button class="btn-mini" style="border-color:#D8CDBD;color:#5E4A36" onclick="libCompose(${r.id})">수정</button>
+          <button class="btn-mini" style="background:#FBE4E3;color:#B5322E;border-color:#F0C9C6" onclick="libDelete(${r.id})">삭제</button></span>`:""}
+      </div>
+      <h2>${supEsc(r.title)}</h2>
+      <div class="lib-dmeta">${supEsc(r.author||"")} · ${when}</div>
+      ${r.body?`<div class="lib-text">${supEsc(r.body)}</div>`:""}
+      <div class="lib-gallery">${media.map(libMediaHTML).join("")}</div>
+    </div></div>`;
+}
+function libCompose(id){
+  libDraft.id=null; libDraft.category="레시피"; libDraft.media=[];
+  let editing=null;
+  if(id!=null){ editing=(state._libRows||[]).find(x=>String(x.id)===String(id)); }
+  if(editing){ libDraft.id=editing.id; libDraft.category=editing.category||"기타"; libDraft.media=(Array.isArray(editing.media)?editing.media:[]).slice(); }
+  libRenderCompose(editing);
+}
+function libRenderCompose(editing){
+  const d=libDraft;
+  const catSel = LIB_CATS.map(c=>`<button type="button" class="lib-cat ${d.category===c?'on':''}" data-c="${c}" onclick="libSetCat('${c}')">${LIB_ICON[c]} ${c}</button>`).join("");
+  $("screen").innerHTML = `<div class="lib-form">
+    <button class="btn-mini" style="border-color:#D8CDBD;color:#5E4A36;margin-bottom:14px" onclick="${editing?`libView(${editing.id})`:"libRenderList()"}">← 취소</button>
+    <div class="card" style="padding:22px 24px">
+      <h2 style="margin-top:0">${editing?"자료 수정":"새 자료 올리기"}</h2>
+      <div class="field"><label>분류</label><div class="lib-catsel">${catSel}</div></div>
+      <div class="field"><label>제목</label><input type="text" id="libTitle" placeholder="예: 김치찌개 밀키트 조리 영상" value="${editing?supEsc(editing.title):""}"></div>
+      <div class="field"><label>내용 (선택)</label><textarea id="libBody" placeholder="설명, 재료, 순서 등을 자유롭게 적어주세요.">${editing?supEsc(editing.body||""):""}</textarea></div>
+      <div class="field"><label>사진 · 영상</label>
+        <div class="lib-addrow">
+          <label class="btn-mini">🖼️ 사진 추가<input type="file" accept="image/*" multiple hidden onchange="libPickImages(this)"></label>
+          <button type="button" class="btn-mini" onclick="libAddVideoLink()">🎬 영상 링크(유튜브 등)</button>
+          <label class="btn-mini">📹 영상 파일<input type="file" accept="video/*" hidden onchange="libPickVideo(this)"></label>
+        </div>
+        <div class="lib-attach-grid" id="libAtt"></div>
+        <p class="hint" style="margin-top:8px">사진은 올릴 때 자동으로 용량을 줄입니다. 레시피 영상은 <b>유튜브/드라이브 링크</b>를 권장해요(저장공간 절약). 직접 올리는 영상 파일은 50MB 이하만 가능합니다.</p>
+      </div>
+      <button class="btn-primary" id="libSaveBtn" onclick="libSave()">${editing?"수정 저장":"올리기"}</button>
+    </div></div>`;
+  libRenderAttach();
+}
+function libSetCat(c){ libDraft.category=c; document.querySelectorAll(".lib-catsel .lib-cat").forEach(b=>b.classList.toggle("on", b.dataset.c===c)); }
+function libAttCell(m,i){
+  let bg="", icon="";
+  if(m.t==="img") bg=`style="background-image:url('${supEsc(m.url)}')"`;
+  else if(m.t==="yt") { bg=`style="background-image:url('https://img.youtube.com/vi/${supEsc(m.id)}/mqdefault.jpg')"`; icon="▶"; }
+  else if(m.t==="vid") icon="📹";
+  else if(m.t==="drive") icon="▶";
+  else icon="🔗";
+  return `<div class="lib-att" ${bg}>${icon?`<span>${icon}</span>`:""}<button type="button" class="rm" onclick="libRemoveAttach(${i})" aria-label="첨부 삭제">✕</button></div>`;
+}
+function libRenderAttach(){ const box=$("libAtt"); if(box) box.innerHTML=libDraft.media.map(libAttCell).join(""); }
+function libRemoveAttach(i){ libDraft.media.splice(i,1); libRenderAttach(); }
+
+function libCompress(file, max=1280, q=0.82){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(file), img=new Image();
+    img.onload=()=>{ URL.revokeObjectURL(url);
+      let w=img.width, h=img.height;
+      if(w>max||h>max){ if(w>=h){ h=Math.round(h*max/w); w=max; } else { w=Math.round(w*max/h); h=max; } }
+      const c=document.createElement("canvas"); c.width=w; c.height=h;
+      c.getContext("2d").drawImage(img,0,0,w,h);
+      c.toBlob(b=> b?res(b):rej(new Error("이미지 변환 실패")), "image/jpeg", q);
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(url); rej(new Error("이미지를 읽을 수 없습니다")); };
+    img.src=url;
+  });
+}
+async function libUpload(file, ext, type){
+  const path=`${state.user.branchId}/${Date.now()}_${Math.random().toString(36).slice(2,7)}.${ext}`;
+  const { error }=await sb.storage.from("library").upload(path, file, { contentType:type, upsert:false });
+  if(error) throw error;
+  return sb.storage.from("library").getPublicUrl(path).data.publicUrl;
+}
+async function libPickImages(input){
+  const files=[...input.files]; input.value="";
+  for(const f of files){
+    try{ toast("사진 올리는 중…");
+      const blob=await libCompress(f);
+      const url=await libUpload(blob,"jpg","image/jpeg");
+      libDraft.media.push({t:"img",url}); libRenderAttach();
+    }catch(e){ toast("사진 업로드 실패: "+(e.message||e)); }
+  }
+}
+async function libPickVideo(input){
+  const f=input.files[0]; input.value=""; if(!f) return;
+  if(f.size>50*1024*1024){ toast("영상이 너무 큽니다(50MB 초과). 유튜브/드라이브 링크를 권장합니다."); return; }
+  try{ toast("영상 올리는 중… 잠시만요");
+    const ext=(f.name.split(".").pop()||"mp4").toLowerCase();
+    const url=await libUpload(f,ext,f.type||"video/mp4");
+    libDraft.media.push({t:"vid",url,name:f.name}); libRenderAttach();
+  }catch(e){ toast("영상 업로드 실패: "+(e.message||e)); }
+}
+function libAddVideoLink(){
+  const raw=prompt("영상 링크를 붙여넣으세요 (유튜브 · 구글드라이브 · 기타 URL)");
+  if(!raw) return;
+  const url=raw.trim(), yt=ytId(url);
+  if(yt) libDraft.media.push({t:"yt",id:yt,url});
+  else { const dv=driveEmbed(url); if(dv) libDraft.media.push({t:"drive",url:dv,name:"구글 드라이브 영상"}); else libDraft.media.push({t:"link",url,name:url}); }
+  libRenderAttach();
+}
+async function libSave(){
+  const title=($("libTitle").value||"").trim(), body=($("libBody").value||"").trim();
+  if(!title){ toast("제목을 입력하세요"); return; }
+  const btn=$("libSaveBtn"); if(btn){ btn.disabled=true; btn.textContent="저장 중…"; }
+  const u=state.user;
+  const row={ category:libDraft.category, title, body, media:libDraft.media, author: u.branchId===0?"본사":u.name, author_id:String(u.branchId) };
+  const q = libDraft.id ? sb.from("library").update(row).eq("id",libDraft.id) : sb.from("library").insert(row);
+  const { error }=await q;
+  if(error){ toast("저장 실패: "+error.message); if(btn){ btn.disabled=false; btn.textContent="올리기"; } return; }
+  toast("자료가 등록되었습니다"); state._libCat=libDraft.category; screenLibrary();
+}
+async function libDelete(id){
+  if(!confirm("이 자료를 삭제할까요? 되돌릴 수 없습니다.")) return;
+  const { error }=await sb.from("library").delete().eq("id",id);
+  if(error){ toast("삭제 실패: "+error.message); return; }
+  toast("삭제되었습니다"); screenLibrary();
 }
 
 init();
