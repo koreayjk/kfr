@@ -290,6 +290,46 @@ input:focus,select:focus,textarea:focus{ box-shadow:0 0 0 3px rgba(181,50,46,.12
 .lib-att .rm{ position:absolute; top:4px; right:4px; width:24px; height:24px; border-radius:50%; border:none; background:rgba(0,0,0,.6); color:#fff; cursor:pointer; font-weight:800; line-height:1; }
 .lib-addrow{ display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; }
 .lib-addrow .btn-mini{ border:1px dashed #c9b89c; color:#6b5b47; background:#fff; padding:0 16px; }
+/* 출퇴근 / 근태 (Attendance) */
+.cam-wrap{ background:#1E1A17; border-radius:14px; overflow:hidden; margin-bottom:12px; aspect-ratio:4/3; }
+.cam-wrap video, .cam-wrap img{ width:100%; height:100%; object-fit:cover; display:block; }
+.cam-wrap video{ transform:scaleX(-1); }
+.btn-ghost{ width:100%; background:#fff; color:#5E4A36; border:1.5px solid #D8CDBD; padding:13px; border-radius:11px; font-size:14px; font-weight:700; cursor:pointer; margin-top:8px; }
+.btn-ghost:hover{ background:#FBF8F2; }
+.clock-state{ font-size:22px; font-weight:800; letter-spacing:-.4px; margin-bottom:4px; }
+.clock-state.on{ color:#1F7A43; }
+.clock-sub{ color:#5E4A36; font-size:14px; margin-bottom:14px; line-height:1.6; }
+.gps-line{ padding:10px 12px; border-radius:10px; font-size:14px; font-weight:600; margin-bottom:6px; background:#F0E9DD; color:#5E4A36; }
+.gps-line.ok{ background:#E3F3E8; color:#1F7A43; }
+.gps-line.warn{ background:#FBF1DC; color:#9A6A1E; }
+.att-table td{ vertical-align:top; min-width:118px; }
+.att-table td:first-child, .att-table th:first-child{ min-width:64px; position:sticky; left:0; background:#fff; z-index:1; }
+.att-table thead th:first-child{ z-index:3; }
+.shift{ font-size:12px; line-height:1.5; padding:4px 6px; border-radius:7px; margin-bottom:4px; background:#E3F3E8; }
+.shift.warn{ background:#FBF1DC; }
+.shift.open{ outline:1.5px dashed #9A6A1E; }
+.shift b{ font-size:13px; }
+.photo-btn{ border:1px solid #D8CDBD; background:#fff; border-radius:6px; padding:2px 6px; font-size:12px; cursor:pointer; min-height:28px; }
+.photo-btn:hover{ background:#FBF8F2; }
+.att-total td{ font-weight:700; border-top:2px solid #E6DFD4; background:#FAF6EF; }
+.late-tag{ display:inline-block; font-size:11px; font-weight:700; color:#B5322E; background:#FBE4E3; border-radius:5px; padding:0 5px; margin-left:4px; }
+.modal{ position:fixed; inset:0; background:rgba(20,15,10,.82); display:grid; place-items:center; z-index:100; padding:16px; }
+.modal img{ max-width:100%; max-height:80vh; border-radius:12px; display:block; }
+.modal .modal-cap{ color:#fff; text-align:center; margin-top:10px; font-size:14px; }
+.kv{ display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid #F0E9DD; font-size:14px; align-items:center; }
+.kv b{ font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric:tabular-nums; }
+.emp-row{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:10px 0; border-bottom:1px solid #F0E9DD; }
+.emp-row.off{ opacity:.5; }
+.emp-row > div:first-child{ flex:1; min-width:120px; font-size:14px; }
+.emp-row select, .emp-row input{ border:1px solid #D8CDBD; border-radius:8px; padding:7px 9px; font-size:13px; }
+.emp-row input[type=password]{ max-width:110px; }
+.emp-pay{ flex-basis:100%; display:flex; flex-wrap:wrap; gap:10px; align-items:center; font-size:12px; color:#6b5b47; }
+.emp-pay label{ display:flex; align-items:center; gap:4px; }
+.emp-pay input{ width:66px; text-align:right; }
+.emp-pay input[type=time]{ width:96px; }
+.peso-mini{ display:inline-flex; align-items:center; border:1px solid #D8CDBD; border-radius:8px; padding:0 6px; }
+.peso-mini input{ border:none; }
+.clock-wrap{ max-width:460px; margin:0 auto; }
 @media (max-width:560px){ .content{ padding:16px; } .topbar{ padding:11px 16px; } .tabs{ padding-left:16px; padding-right:16px; } }
 @media (prefers-reduced-motion:reduce){ *{ transition:none!important; scroll-behavior:auto!important; } }
 </style>
@@ -342,6 +382,7 @@ const I18N = {
   tab_closing:{ko:"마감 입력",en:"Daily Closing"},
   tab_order:{ko:"밀키트 주문",en:"Meal Kit Order"},
   tab_library:{ko:"자료실",en:"Resources"},
+  tab_clock:{ko:"출퇴근",en:"Time Clock"},
   closing_title:{ko:"일일 마감",en:"Daily Closing",tl:"Araw-araw na Closing"},
   h_menu:{ko:"메뉴",en:"Menu",tl:"Menu"},
   h_price:{ko:"기본가",en:"Price",tl:"Presyo"},
@@ -471,13 +512,13 @@ async function doLogin() {
   state.tab = id === 0 ? "dashboard" : "closing";
   renderApp();
 }
-function logout() { state.user = null; renderLogin(); }
+function logout() { attResetCam(); clk.emp = null; state.user = null; renderLogin(); }
 
 function renderApp() {
   const u = state.user, hq = u.branchId === 0;
   const tabs = hq
-    ? [["dashboard","지점 현황"],["settle","가맹점 정산"],["orders","밀키트 관리"],["supply","☕ 공급요청"],["payouts","지급 장부"],["daily","일별 매출"],["menurank","메뉴 순위"],["report","월별 보고서"],["library","자료실"],["manage","관리"]]
-    : [["closing",tt("tab_closing")],["myorder",tt("tab_order")],["library",tt("tab_library")]];
+    ? [["dashboard","지점 현황"],["settle","가맹점 정산"],["orders","밀키트 관리"],["supply","☕ 공급요청"],["payouts","지급 장부"],["daily","일별 매출"],["menurank","메뉴 순위"],["report","월별 보고서"],["attend","근태"],["library","자료실"],["manage","관리"]]
+    : [["closing",tt("tab_closing")],["myorder",tt("tab_order")],["clock",tt("tab_clock")],["library",tt("tab_library")]];
   const role = hq ? "전체 관리" : (u.type==="DIRECT"?tt("direct_branch"):tt("franchise_branch"));
   $("root").innerHTML = `
     <div class="topbar">
@@ -490,7 +531,7 @@ function renderApp() {
   renderScreen();
   if (hq) refreshSupplyBadge();
 }
-function go(t) { state.tab = t; renderApp(); }
+function go(t) { if (state.tab==="clock") attResetCam(); state.tab = t; renderApp(); }
 async function renderScreen() {
   const t = state.tab;
   if (t === "closing") return screenClosing();
@@ -504,6 +545,8 @@ async function renderScreen() {
   if (t === "menurank") return screenMenuRank();
   if (t === "report") return screenReport();
   if (t === "library") return screenLibrary();
+  if (t === "clock") return screenClock();
+  if (t === "attend") return screenAttend();
   if (t === "manage") return screenManage();
 }
 
@@ -1743,6 +1786,411 @@ async function libDelete(id){
   const { error }=await sb.from("library").delete().eq("id",id);
   if(error){ toast("삭제 실패: "+error.message); return; }
   toast("삭제되었습니다"); screenLibrary();
+}
+
+// ── 출퇴근 / 근태 (Attendance): 지점별 직원 · 사진 + GPS, 시각·거리·인증은 DB 트리거가 결정 ──
+const ATT_TZ = "Asia/Manila", ATT_BUCKET = "kfr-att", ATT_STALE_MS = 16 * 3600e3;
+const attToday = () => new Date().toLocaleDateString("en-CA", { timeZone: ATT_TZ });
+const attMonth = () => attToday().slice(0, 7);
+const attTimeHM = (ts) => ts ? new Date(ts).toLocaleTimeString("en-GB", { timeZone: ATT_TZ, hour:"2-digit", minute:"2-digit" }) : "—";
+const attDur = (a, b) => Math.max(0, Math.round((new Date(b) - new Date(a)) / 60000));
+const attFmtDur = (m) => `${Math.floor(m/60)}h ${String(m%60).padStart(2,"0")}m`;
+const attToHM = (t) => String(t || "").slice(0, 5);
+const attHmToMin = (t) => { const [h,m] = attToHM(t).split(":").map(Number); return (h||0)*60 + (m||0); };
+const attDayStart = (d) => Date.parse(`${d}T00:00:00+08:00`);
+const attMinOfDay = (ts, d) => Math.round((new Date(ts).getTime() - attDayStart(d)) / 60000);
+const attEmpName = (e) => !e ? "" : (state.lang==="ko" ? e.name : (e.name_en || e.name));
+// 현지화: aL = 라벨(영어+따갈로그 병기), aT = 평문(한/영)
+function aL(ko, en, tl){ return state.lang==="ko" ? ko : (en + (tl ? `<span class="lang-sub">${tl}</span>` : "")); }
+function aT(ko, en){ return state.lang==="ko" ? ko : en; }
+function attSetupNote(e){
+  return `<div class="card"><h2>${aT("출퇴근","Attendance")}</h2><div class="setup-note">${aT("아직 출퇴근 기능이 준비되지 않았어요. Supabase SQL Editor에서 ","Attendance isn't set up yet. Run ")}<b>supabase/attendance.sql</b>${aT(" 을 실행해 주세요.",". in the Supabase SQL Editor.")}<br><br>${aT("오류","Error")}: ${supEsc(e?.message || e)}</div></div>`;
+}
+function attGetPos(){
+  return new Promise((res, rej) => { if (!navigator.geolocation) return rej(new Error("GPS not supported"));
+    navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy:true, timeout:15000, maximumAge:0 }); });
+}
+function attDist(lat, lng, slat, slng){
+  if (slat == null || slng == null) return null;
+  const R = 6371000, rad = (x) => x*Math.PI/180, la1 = rad(lat), la2 = rad(Number(slat));
+  const h = Math.sin((la2-la1)/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(rad(Number(slng)-lng)/2)**2;
+  return Math.round(2 * R * Math.asin(Math.sqrt(h)));
+}
+async function attLoadEmps(branchId){
+  const { data, error } = await sb.from("employees")
+    .select("id,branch_id,name,name_en,pin,role,active,daily_rate,std_hours,shift_start,shift_end,break_min")
+    .eq("branch_id", String(branchId)).order("id");
+  if (error) throw error;
+  return data || [];
+}
+
+// 직원 명단 관리 (지점 자기 것 / 본사는 선택 지점) — 공용
+function empMgmtHTML(branchId, emps){
+  const rows = emps.map((e) => `<div class="emp-row ${e.active===false?"off":""}">
+    <div><b>${supEsc(e.name)}</b>${e.name_en?`<span class="m-en">${supEsc(e.name_en)}</span>`:""}</div>
+    <select aria-label="role" onchange="attUpdateEmp(${e.id},'role',this.value)">${["STAFF","MANAGER"].map((r)=>`<option value="${r}" ${e.role===r?"selected":""}>${r==="STAFF"?aT("직원","Staff"):aT("매니저","Manager")}</option>`).join("")}</select>
+    <input type="password" inputmode="numeric" placeholder="${aT("새 PIN","New PIN")}" aria-label="PIN" onchange="attUpdateEmp(${e.id},'pin',this.value)">
+    <button class="mng-del" onclick="attUpdateEmp(${e.id},'active',${e.active===false})">${e.active===false?aT("복구","Restore"):aT("비활성","Disable")}</button>
+    <div class="emp-pay">
+      <label>${aT("일급","Daily")} <span class="peso-mini">${PESO}<input type="number" min="0" step="any" value="${Number(e.daily_rate||0)}" onchange="attUpdateEmp(${e.id},'daily_rate',Number(this.value)||0)"></span></label>
+      <label>${aT("출근","In")} <input type="time" value="${attToHM(e.shift_start)}" onchange="attUpdateEmp(${e.id},'shift_start',this.value)"></label>
+      <label>${aT("퇴근","Out")} <input type="time" value="${attToHM(e.shift_end)}" onchange="attUpdateEmp(${e.id},'shift_end',this.value)"></label>
+    </div></div>`).join("");
+  return `<div class="card"><h2>${aT("직원","Employees")}</h2>
+    <div class="add-form">
+      <input id="empName" placeholder="${aT("이름","Name")}">
+      <input id="empNameEn" placeholder="${aT("영문 이름","English name")}">
+      <input id="empPin" type="password" inputmode="numeric" placeholder="PIN" style="max-width:90px">
+      <button class="btn-mini" onclick="attAddEmp('${branchId}')">${aT("추가","Add")}</button>
+    </div>
+    ${rows || `<p class="empty">${aT("등록된 직원이 없습니다.","No staff yet.")}</p>`}
+    <p class="hint">${aT("PIN 칸에 새 번호를 입력하고 칸을 벗어나면 저장됩니다. 퇴사자는 삭제 대신 '비활성'(기록 보존). 일급·근무시간은 급여(2단계)와 지각 표시에 쓰입니다.","Type a new PIN and leave the box to save. Disable instead of deleting (keeps history). Daily rate and shift feed payroll (phase 2) and the late tag.")}</p></div>`;
+}
+async function attAddEmp(branchId){
+  const name = $("empName").value.trim(), name_en = $("empNameEn").value.trim(), pin = $("empPin").value.trim();
+  if (!name || !pin) { toast(aT("이름과 PIN을 입력하세요","Enter name and PIN")); return; }
+  const { error } = await sb.from("employees").insert({ branch_id:String(branchId), name, name_en:name_en||null, pin, role:"STAFF" });
+  if (error) { toast(aT("저장 실패: ","Save failed: ") + error.message); return; }
+  toast(aT("직원이 추가되었습니다","Staff added")); renderScreen();
+}
+async function attUpdateEmp(id, field, value){
+  if (field === "pin") { value = String(value).trim(); if (!value) { toast(aT("PIN은 비울 수 없습니다","PIN can't be empty")); renderScreen(); return; } }
+  const { error } = await sb.from("employees").update({ [field]: value }).eq("id", id);
+  if (error) { toast(aT("저장 실패: ","Save failed: ") + error.message); return; }
+  toast(aT("저장되었습니다","Saved"));
+  if (field === "active" || field === "pin") renderScreen();
+}
+
+// ── 지점 계정: 출퇴근 ──
+const clk = { emp:null, stream:null, blob:null, url:null, pos:null, posErr:null, posPromise:null, _branch:null };
+function attStopCamera(){ if (clk.stream) { clk.stream.getTracks().forEach((t) => t.stop()); clk.stream = null; } }
+function attResetCam(){ attStopCamera(); if (clk.url) URL.revokeObjectURL(clk.url); clk.blob=null; clk.url=null; clk.pos=null; clk.posErr=null; clk.posPromise=null; }
+async function clkOpenShift(empId){
+  const { data, error } = await sb.from("attendance").select("id,date,clock_in,verified,distance_m")
+    .eq("employee_id", empId).is("clock_out", null).order("id", { ascending:false }).limit(1);
+  if (error) throw error;
+  const r = data?.[0] || null;
+  return r && Date.now() - new Date(r.clock_in).getTime() > ATT_STALE_MS ? { ...r, stale:true } : r;
+}
+async function screenClock(){
+  attResetCam();
+  const bId = state.user.branchId;
+  let brow, emps;
+  try {
+    const [br, em] = await Promise.all([
+      sb.from("branches").select("id,name,address,lat,lng,geofence_m").eq("id", String(bId)).single(),
+      attLoadEmps(bId),
+    ]);
+    if (br.error) throw br.error;
+    brow = br.data; emps = em;
+  } catch (e) { $("screen").innerHTML = attSetupNote(e); return; }
+  clk._branch = brow;
+  if (clk.emp && !emps.some((e) => String(e.id) === String(clk.emp.id))) clk.emp = null;
+  const actives = emps.filter((e) => e.active !== false);
+  const hasLoc = brow.lat != null && brow.lng != null;
+  let main, recent = "";
+  if (!clk.emp) {
+    const opts = actives.length ? actives.map((e) => `<option value="${e.id}">${supEsc(attEmpName(e))}</option>`).join("")
+      : `<option value="">${aT("직원 없음","No staff")}</option>`;
+    main = `<div class="card clock-wrap">
+      <div class="clock-state">${aL("출퇴근","Time Clock","Pasok/Labas")}</div>
+      <div class="clock-sub">${supEsc(brow.name)} · ${attToday()}</div>
+      <div class="field"><label>${aL("직원 선택","Select staff","Piliin ang empleyado")}</label>
+        <select id="clkEmp" ${actives.length?"":"disabled"}>${opts}</select></div>
+      <div class="field"><label>${aL("개인 PIN","Your PIN","PIN mo")}</label>
+        <input id="clkPin" type="password" inputmode="numeric" placeholder="••••"></div>
+      <div id="clkErr"></div>
+      <button class="btn-primary" ${actives.length?"":"disabled"} onclick="clkVerify()">${aL("확인","Continue","Magpatuloy")}</button>
+      <p class="hint">${aT("지점 공용 폰이나 본인 폰 모두 가능합니다. 본인을 고르고 개인 PIN을 입력하세요.","Use the branch phone or your own. Pick yourself and enter your PIN.")}</p>
+    </div>`;
+  } else {
+    main = await clkDutyHTML(brow);
+    recent = await clkRecentHTML();
+  }
+  $("screen").innerHTML = `
+    ${hasLoc ? "" : `<div class="setup-note">${aT("⚠️ 이 지점의 좌표가 아직 등록되지 않았습니다. 오른쪽 '지점 위치'에서 매장 안에 있을 때 📍를 눌러 등록하세요. 그 전까지 출근은 ⚠️(위치 미확인)로 기록됩니다.","⚠️ This branch has no coordinates yet. Register them with 📍 under 'Branch location' while inside the store. Until then clock-ins are marked ⚠️ (location unverified).")}</div>`}
+    <div class="grid-2">
+      <div>${main}${recent}</div>
+      <div>${clkBranchLocCard(brow)}${empMgmtHTML(bId, emps)}</div>
+    </div>`;
+}
+async function clkVerify(){
+  const id = $("clkEmp").value, pin = ($("clkPin").value || "").trim();
+  if (!id) return;
+  if (!pin) { $("clkErr").innerHTML = `<div class="err">${aT("PIN을 입력하세요","Enter your PIN")}</div>`; return; }
+  const { data, error } = await sb.from("employees").select("id,name,name_en,pin,branch_id,shift_start,shift_end").eq("id", id).single();
+  if (error || !data) { $("clkErr").innerHTML = `<div class="err">${aT("직원을 찾을 수 없습니다","Staff not found")}</div>`; return; }
+  if (String(data.branch_id) !== String(state.user.branchId)) { $("clkErr").innerHTML = `<div class="err">${aT("다른 지점 직원입니다","Different branch")}</div>`; return; }
+  if (String(data.pin) !== pin) { $("clkErr").innerHTML = `<div class="err">${aT("PIN이 올바르지 않습니다","Incorrect PIN")}</div>`; return; }
+  clk.emp = data; screenClock();
+}
+function clkChangeEmp(){ attResetCam(); clk.emp = null; screenClock(); }
+async function clkDutyHTML(brow){
+  const e = clk.emp;
+  let shift; try { shift = await clkOpenShift(e.id); } catch (err) { return attSetupNote(err); }
+  const open = shift && !shift.stale ? shift : null, stale = shift?.stale ? shift : null;
+  const head = `<div class="clock-sub">${supEsc(attEmpName(e))} · ${supEsc(brow.name)} · ${attToday()}
+    <button class="photo-btn" style="margin-left:6px" onclick="clkChangeEmp()">${aT("직원 바꾸기","Change")}</button></div>`;
+  if (open) {
+    return `<div class="card clock-wrap">
+      <div class="clock-state on">● ${aL("근무 중","On duty","Nagtatrabaho")}</div>${head}
+      <div class="gps-line ${open.verified?"ok":"warn"}">${aT("출근","In")} ${attTimeHM(open.clock_in)} · ${attFmtDur(attDur(open.clock_in, new Date()))} · 📍 ${open.distance_m==null?"—":open.distance_m+"m"} ${open.verified?"✅":"⚠️"}</div>
+      <button class="btn-primary" id="clockOutBtn" onclick="clkClockOut(${open.id})">${aL("퇴근","Clock out","Labas")}</button>
+    </div>`;
+  }
+  return `<div class="card clock-wrap">
+    <div class="clock-state">${aL("근무 전","Not clocked in","Hindi pa pasok")}</div>${head}
+    ${stale ? `<div class="setup-note">${aT(`${stale.date} 근무의 퇴근 기록이 없습니다. 본사가 퇴근 시각을 입력해야 합니다. 오늘 출근은 그대로 가능합니다.`,`No clock-out for ${stale.date}. The owner must enter it. You can still clock in today.`)}</div>` : ""}
+    <div id="camBox"><button class="btn-primary" onclick="clkStart()">📷 ${aL("사진 찍고 출근","Take photo & clock in","Kuha ng litrato at pasok")}</button>
+      <p class="hint">${aT("앱 안의 카메라로만 찍힙니다(갤러리 불가). 위치도 함께 기록됩니다.","In-app camera only (no gallery). Your location is recorded too.")}</p></div>`;
+}
+async function clkRecentHTML(){
+  const { data, error } = await sb.from("attendance").select("id,date,clock_in,clock_out,verified").eq("employee_id", clk.emp.id).order("id", { ascending:false }).limit(10);
+  if (error) return "";
+  const rows = (data||[]).map((r) => `<tr><td>${r.date.slice(5)}</td><td class="num">${attTimeHM(r.clock_in)}</td><td class="num">${r.clock_out?attTimeHM(r.clock_out):"…"}</td><td class="num">${r.clock_out?attFmtDur(attDur(r.clock_in,r.clock_out)):"—"}</td><td>${r.verified?"✅":"⚠️"}</td></tr>`).join("");
+  return `<div class="card"><h2>${aL("최근 기록","Recent records","Mga rekord")}</h2>${rows?`<table class="data-table"><thead><tr><th>${aT("날짜","Date")}</th><th class="num">${aT("출근","In")}</th><th class="num">${aT("퇴근","Out")}</th><th class="num">${aT("근무","Hours")}</th><th></th></tr></thead><tbody>${rows}</tbody></table>`:`<p class="empty">—</p>`}</div>`;
+}
+async function clkStart(){
+  const box = $("camBox");
+  if (!navigator.mediaDevices?.getUserMedia) { box.innerHTML = `<div class="err">${aT("이 기기에서는 카메라를 쓸 수 없습니다.","Camera not available on this device.")}</div>`; return; }
+  attStopCamera();
+  clk.pos = null; clk.posErr = null;
+  clk.posPromise = attGetPos().then((p) => { clk.pos = p.coords; }).catch((e) => { clk.posErr = e; }).finally(clkGpsLine);
+  try { clk.stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"user", width:{ ideal:960 }, height:{ ideal:720 } }, audio:false }); }
+  catch (e) { box.innerHTML = `<div class="err">${aT("카메라 권한이 거부되었습니다.","Camera permission denied.")}</div><button class="btn-ghost" onclick="screenClock()">${aT("취소","Cancel")}</button>`; return; }
+  box.innerHTML = `<div class="cam-wrap"><video id="camVideo" playsinline muted autoplay></video></div>
+    <div id="gpsLine" class="gps-line"></div>
+    <button class="btn-primary" onclick="clkCapture()">📸 ${aL("촬영","Take photo","Kuha")}</button>
+    <button class="btn-ghost" onclick="screenClock()">${aT("취소","Cancel")}</button>`;
+  clkGpsLine();
+  const v = $("camVideo"); v.srcObject = clk.stream; v.play().catch(() => {});
+}
+function clkCapture(){
+  const v = $("camVideo"); if (!v || !v.videoWidth) return;
+  const scale = Math.min(1, 640 / v.videoWidth), c = document.createElement("canvas");
+  c.width = Math.round(v.videoWidth * scale); c.height = Math.round(v.videoHeight * scale);
+  c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+  c.toBlob((b) => { if (!b) return; attStopCamera(); if (clk.url) URL.revokeObjectURL(clk.url);
+    clk.blob = b; clk.url = URL.createObjectURL(b);
+    $("camBox").innerHTML = `<div class="cam-wrap"><img src="${clk.url}" alt=""></div><div id="gpsLine" class="gps-line"></div>
+      <button class="btn-primary" id="confirmIn" onclick="clkConfirm()">✅ ${aL("출근","Clock in","Pasok")}</button>
+      <button class="btn-ghost" onclick="clkStart()">↺ ${aT("다시","Retake")}</button>`;
+    clkGpsLine();
+  }, "image/jpeg", 0.6);
+}
+function clkGpsLine(){
+  const el = $("gpsLine"); if (!el) return;
+  const fence = Number(clk._branch?.geofence_m || 100), slat = clk._branch?.lat, slng = clk._branch?.lng;
+  if (clk.pos) {
+    const d = attDist(clk.pos.latitude, clk.pos.longitude, slat, slng);
+    if (d == null) { el.className = "gps-line"; el.textContent = aT("📍 위치 기록됨 (지점 좌표 미등록)","📍 Location recorded (branch coords not set)"); return; }
+    const ok = d <= fence; el.className = "gps-line " + (ok ? "ok" : "warn");
+    el.textContent = `📍 ${aT("매장까지","Store")} ${d}m (±${Math.round(clk.pos.accuracy)}m) ${ok ? "✅" : "⚠️"}`;
+  } else if (clk.posErr) { el.className = "gps-line warn"; el.textContent = aT("📍 위치를 가져오지 못했습니다","📍 Couldn't get location"); }
+  else { el.className = "gps-line"; el.textContent = aT("📍 위치 확인 중…","📍 Getting location…"); }
+}
+async function clkConfirm(){
+  const btn = $("confirmIn"); if (btn) { btn.disabled = true; btn.textContent = aT("저장 중…","Saving…"); }
+  const restore = () => { if (btn) { btn.disabled = false; btn.innerHTML = `✅ ${aL("출근","Clock in","Pasok")}`; } };
+  try {
+    if (!clk.pos && !clk.posErr) await Promise.race([clk.posPromise, new Promise((r) => setTimeout(r, 10000))]);
+    if (!clk.pos && !confirm(aT("위치 없이 출근할까요? (⚠️로 표시됩니다)","Clock in without location? (marked ⚠️)"))) { restore(); return; }
+    const cur = await clkOpenShift(clk.emp.id);
+    if (cur && !cur.stale) { toast(aT("이미 출근 중입니다","Already clocked in")); return screenClock(); }
+    const bId = String(state.user.branchId), d = attToday();
+    const path = `${bId}/${d}/${clk.emp.id}_${Date.now()}.jpg`;
+    const up = await sb.storage.from(ATT_BUCKET).upload(path, clk.blob, { contentType:"image/jpeg", upsert:false });
+    if (up.error) throw up.error;
+    const { data, error } = await sb.from("attendance").insert({ branch_id:bId, employee_id:clk.emp.id, date:d, clock_in:new Date().toISOString(),
+      photo_path:path, lat:clk.pos?.latitude ?? null, lng:clk.pos?.longitude ?? null, accuracy_m:clk.pos ? Math.round(clk.pos.accuracy) : null })
+      .select("clock_in,verified,distance_m").single();
+    if (error) throw error;
+    attResetCam();
+    toast(`${aT("출근","Clocked in")} ${attTimeHM(data.clock_in)} ${data.verified ? "✅" : "⚠️"}`);
+    screenClock();
+  } catch (e) { toast(aT("저장 실패: ","Save failed: ") + (e.message || e)); restore(); }
+}
+async function clkClockOut(id){
+  if (!confirm(aT("퇴근할까요?","Clock out now?"))) return;
+  const btn = $("clockOutBtn"); if (btn) { btn.disabled = true; btn.textContent = aT("위치 확인 중…","Getting location…"); }
+  let pos = null; try { pos = (await attGetPos()).coords; } catch (_) {}
+  const { data, error } = await sb.from("attendance").update({ clock_out:new Date().toISOString(), out_lat:pos?.latitude ?? null, out_lng:pos?.longitude ?? null })
+    .eq("id", id).select("clock_in,clock_out").single();
+  if (error) { toast(aT("저장 실패: ","Save failed: ") + error.message); return screenClock(); }
+  toast(`${aT("퇴근","Clocked out")} ${attTimeHM(data.clock_out)} · ${attFmtDur(attDur(data.clock_in, data.clock_out))}`);
+  screenClock();
+}
+function clkBranchLocCard(brow){
+  const has = brow.lat != null && brow.lng != null;
+  return `<div class="card"><h2>${aL("지점 위치","Branch location","Lokasyon")}</h2>
+    <div class="kv"><span>${aT("좌표","Coordinates")}</span><b>${has?`${Number(brow.lat).toFixed(5)}, ${Number(brow.lng).toFixed(5)}`:aT("미등록","Not set")}</b></div>
+    <div class="kv"><span>${aT("허용 반경","Allowed radius")}</span><b>${Number(brow.geofence_m||100)} m</b></div>
+    <button class="btn-primary" onclick="clkRegisterLoc()">📍 ${aL("이 위치를 지점 좌표로 등록","Set this as branch location","Itakda ang lokasyon dito")}</button>
+    <p class="hint">${aT("매장 안에서 한 번 눌러 주세요. 출근 시 이 좌표와의 거리로 '매장 출근'을 확인합니다. 반경은 본사가 설정합니다.","Press once while inside the store. Clock-ins are checked against this point. The owner sets the radius.")}</p></div>`;
+}
+async function clkRegisterLoc(){
+  try {
+    const p = await attGetPos(); const { latitude:lat, longitude:lng, accuracy } = p.coords;
+    if (!confirm(`${aT("이 위치를 지점 좌표로 등록할까요?","Save this as the branch location?")}\n${lat.toFixed(5)}, ${lng.toFixed(5)} (±${Math.round(accuracy)}m)`)) return;
+    const { error } = await sb.from("branches").update({ lat, lng }).eq("id", String(state.user.branchId));
+    if (error) { toast(aT("저장 실패: ","Save failed: ") + error.message); return; }
+    toast(aT("저장되었습니다","Saved")); screenClock();
+  } catch (e) { toast(aT("위치를 가져오지 못했습니다: ","Couldn't get location: ") + (e.message || e)); }
+}
+
+// ── 본사: 근태 (지점 × 월, 사진은 누를 때만) ──
+const attState = { month:null, branch:null, rows:[], emps:[] };
+const attPhotoRows = new Map();
+const attEmpById = (id) => attState.emps.find((e) => String(e.id) === String(id));
+function attShiftCalc(e, date, recs){
+  const start = attHmToMin(e.shift_start || "09:00"), first = recs[0];
+  if (!first) return { late:0 };
+  return { late: Math.max(0, attMinOfDay(first.clock_in, date) - start) };
+}
+async function screenAttend(){
+  const bs = state.branches.filter((b) => String(b.id) !== "0");
+  if (!bs.length) { $("screen").innerHTML = `<div class="card"><div class="setup-note">${aT("등록된 지점이 없습니다.","No branches yet.")}</div></div>`; return; }
+  if (!attState.branch || !bs.some((b) => String(b.id) === String(attState.branch))) attState.branch = String(bs[0].id);
+  if (!attState.month) attState.month = attMonth();
+  const month = attState.month, bId = attState.branch;
+  const [y, m] = month.split("-").map(Number);
+  const end = `${month}-${String(new Date(y, m, 0).getDate()).padStart(2,"0")}`;
+  let emps, brow, att, retention = 90;
+  try {
+    const [em, br, at, st] = await Promise.all([
+      attLoadEmps(bId),
+      sb.from("branches").select("id,name,address,lat,lng,geofence_m").eq("id", String(bId)).single(),
+      sb.from("attendance").select("id,employee_id,date,clock_in,clock_out,photo_path,photo_purged_at,distance_m,out_distance_m,accuracy_m,verified,manual_edit,orig_clock_in,note").eq("branch_id", String(bId)).gte("date", `${month}-01`).lte("date", end).order("clock_in"),
+      sb.from("app_settings").select("value").eq("key","att_photo_retention_days").limit(1),
+    ]);
+    if (br.error) throw br.error; if (at.error) throw at.error;
+    emps = em; brow = br.data; att = at.data || [];
+    retention = Number(st.data?.[0]?.value || 90);
+  } catch (e) { $("screen").innerHTML = attSetupNote(e); return; }
+  attState.rows = att; attState.emps = emps; state._attRetention = retention;
+  att.forEach((r) => attPhotoRows.set(r.id, r));
+  const d0 = attToday();
+  const showEmps = emps.filter((e) => e.active !== false || att.some((r) => r.employee_id === e.id));
+  const dates = [...new Set(att.map((r) => r.date))].sort().reverse();
+  const cell = (list) => list.map((r, k) => {
+    const open = !r.clock_out, e = attEmpById(r.employee_id);
+    const fix = ` <button class="photo-btn" title="${aT("시각 수정","Edit time")}" onclick="attEditShift(${r.id})">${open && r.date < d0 ? aT("퇴근 입력","Set out") : "✏️"}</button>`;
+    const sc = k === 0 && e?.shift_start ? attShiftCalc(e, r.date, list) : null;
+    return `<div class="shift ${r.verified?"":"warn"} ${open?"open":""}">
+      <b>${attTimeHM(r.clock_in)}–${open ? (r.date === d0 ? aT("근무 중","on duty") : "?") : attTimeHM(r.clock_out)}</b>${r.manual_edit ? ` <span class="muted">${aT("수정됨","edited")}${r.orig_clock_in ? ` (${aT("원래","was")} ${attTimeHM(r.orig_clock_in)})` : ""}</span>` : ""}
+      ${sc?.late ? `<span class="late-tag">${aT("지각","late")} ${sc.late}${aT("분","m")}</span>` : ""}<br>
+      📍 ${r.distance_m==null?"—":r.distance_m+"m"} ${r.verified?"✅":"⚠️"}${r.photo_path ? ` <button class="photo-btn" onclick="attShowPhoto(${r.id})">📷</button>` : r.photo_purged_at ? ` <span class="muted" title="${aT("보관기간이 지나 사진 정리됨","Photo removed after retention")}">📷✕</span>` : ""}${fix}
+      ${r.note ? `<br><span class="muted">${supEsc(r.note)}</span>` : ""}
+      ${r.clock_out ? `<br><span class="muted">${attFmtDur(attDur(r.clock_in, r.clock_out))}${r.out_distance_m != null ? ` · ${aT("퇴근","out")} ${r.out_distance_m}m` : ""}</span>` : ""}
+    </div>`;
+  }).join("");
+  const body = dates.map((d) => `<tr><td><b>${d.slice(8)}</b> <span class="muted">${new Date(d+"T00:00:00").toLocaleDateString(state.lang==="ko"?"ko-KR":"en-US",{weekday:"short"})}</span></td>
+    ${showEmps.map((e) => `<td>${cell(att.filter((r) => r.date === d && r.employee_id === e.id))}</td>`).join("")}</tr>`).join("");
+  const totals = showEmps.map((e) => {
+    const mine = att.filter((r) => r.employee_id === e.id);
+    const mins = mine.filter((r) => r.clock_out).reduce((s, r) => s + attDur(r.clock_in, r.clock_out), 0);
+    const days = new Set(mine.map((r) => r.date)).size, warn = mine.filter((r) => !r.verified).length;
+    return `<td>${attFmtDur(mins)}<br><span class="muted">${days}${aT("일"," d")}${warn ? ` · ⚠️${warn}` : ""}</span></td>`;
+  }).join("");
+  const branchOpts = bs.map((b) => `<option value="${b.id}" ${String(b.id)===String(bId)?"selected":""}>${supEsc(b.name)}</option>`).join("");
+  const hasLoc = brow.lat != null && brow.lng != null;
+  $("screen").innerHTML = `<div class="report-title">${aT("근태","Attendance")} <span>· ${supEsc(brow.name)} · ${month}</span></div>
+    <div class="filter-bar">
+      <select aria-label="branch" onchange="attState.branch=this.value;screenAttend()">${branchOpts}</select>
+      <input type="month" value="${month}" aria-label="month" onchange="attState.month=this.value;screenAttend()">
+    </div>
+    <div class="card">
+      ${dates.length ? `<div class="tscroll"><table class="data-table att-table">
+        <thead><tr><th>${aT("날짜","Date")}</th>${showEmps.map((e) => `<th>${supEsc(attEmpName(e))}</th>`).join("")}</tr></thead>
+        <tbody>${body}<tr class="att-total"><td>${aT("월 합계","Total")}</td>${totals}</tr></tbody></table></div>`
+        : `<p class="empty">${aT("이 달의 출근 기록이 없습니다.","No attendance this month.")}</p>`}
+      <p class="hint">✅ ${aT("매장 반경 안에서 출근","Clocked in inside the store radius")} · ⚠️ ${aT("반경 밖이거나 위치 없음","Outside the radius or no location")} · ${aT("시각은 모두 서버 기록(필리핀 시간). ✏️로 수정하면 '수정됨'과 원래 시각이 남습니다.","All times are server-recorded (PH time). Edits with ✏️ keep an 'edited' mark and the original time.")}</p>
+    </div>
+    <div class="card"><h2>＋ ${aT("빠진 근무 추가","Add a missing shift")}</h2>
+      <div class="add-form"><select id="asEmp" aria-label="staff">${emps.filter((e) => e.active !== false).map((e) => `<option value="${e.id}">${supEsc(attEmpName(e))}</option>`).join("") || `<option value="">${aT("직원 없음","No staff")}</option>`}</select>
+        <input id="asDate" type="date" value="${d0}" max="${d0}" aria-label="date" style="flex:none;max-width:150px">
+        <input id="asIn" type="time" value="09:00" aria-label="in" style="flex:none;max-width:110px"><input id="asOut" type="time" value="18:00" aria-label="out" style="flex:none;max-width:110px">
+        <button class="btn-mini" onclick="attAddShift()">${aT("추가","Add")}</button></div>
+      <p class="hint">${aT("출근 사진을 못 찍은 날 등. 사진·위치 없이 '수정됨'으로 표시됩니다.","For days without a photo clock-in. Marked as edited, no photo/location.")}</p></div>
+    <div class="grid-2">
+      <div class="card"><h2>${aT("지점 위치 · 반경","Branch location · radius")}</h2>
+        <div class="kv"><span>${aT("좌표","Coordinates")}</span><b>${hasLoc?`${Number(brow.lat).toFixed(5)}, ${Number(brow.lng).toFixed(5)}`:aT("미등록","Not set")}</b>${hasLoc?` <button class="mng-del" onclick="attClearLoc('${bId}')">${aT("초기화","Reset")}</button>`:""}</div>
+        <div class="kv"><span>${aT("표시 주소","Address")}</span><input type="text" value="${supEsc(brow.address||"")}" placeholder="${aT("(선택) 주소","(optional) address")}" onchange="attSetAddress('${bId}',this.value)" style="flex:1;border:1px solid #D8CDBD;border-radius:7px;padding:6px 8px"></div>
+        <div class="kv"><span>${aT("허용 반경","Allowed radius")}</span><span><input type="number" min="10" step="10" value="${Number(brow.geofence_m||100)}" onchange="attSetRadius('${bId}',this.value)" style="width:84px;border:1px solid #D8CDBD;border-radius:7px;padding:6px 8px;text-align:right"> m</span></div>
+        <p class="hint">${aT("좌표 등록은 지점 계정이 매장 안에서 '출퇴근' 화면의 📍로 합니다. 본사는 반경·주소를 조정하거나 좌표를 초기화할 수 있습니다.","The branch registers coordinates from its Time Clock screen (📍) inside the store. The owner adjusts radius/address or resets the coordinates.")}</p></div>
+      <div>${empMgmtHTML(bId, emps)}</div>
+    </div>
+    <div class="card"><h2>${aT("출근 사진 보관","Clock-in photo retention")}</h2>
+      <div class="kv"><span>${aT("보관 기간","Keep for")}</span><span><input type="number" min="30" max="730" step="10" value="${retention}" onchange="attSetRetention(this.value)" style="width:84px;border:1px solid #D8CDBD;border-radius:7px;padding:6px 8px;text-align:right"> ${aT("일","days")}</span></div>
+      <button class="btn-mini" onclick="attPurgePhotos(true)">${aT("지금 정리","Clean now")}</button>
+      <p class="hint">${aT("보관 기간이 지난 출근 사진만 비웁니다(최소 30일). 시각·위치 기록은 그대로 남습니다.","Only clock-in photos older than the retention period are removed (min 30 days). Time and location records are kept.")}</p></div>`;
+}
+async function attShowPhoto(id){
+  const r = attPhotoRows.get(id); if (!r?.photo_path) return;
+  const { data, error } = await sb.storage.from(ATT_BUCKET).createSignedUrl(r.photo_path, 300);
+  if (error) { toast(error.message); return; }
+  const e = attEmpById(r.employee_id), m = document.createElement("div");
+  m.className = "modal"; m.setAttribute("role", "dialog");
+  m.innerHTML = `<div><img src="${data.signedUrl}" alt=""><div class="modal-cap">${supEsc(attEmpName(e))} · ${r.date} ${attTimeHM(r.clock_in)} · 📍 ${r.distance_m==null?"—":r.distance_m+"m"}${r.accuracy_m != null ? ` (±${r.accuracy_m}m)` : ""} ${r.verified?"✅":"⚠️"}</div></div>`;
+  const close = () => { m.remove(); document.removeEventListener("keydown", onKey); };
+  const onKey = (ev) => { if (ev.key === "Escape") close(); };
+  m.onclick = close; document.addEventListener("keydown", onKey); document.body.appendChild(m);
+}
+async function attEditShift(id){
+  const r = attState.rows.find((x) => x.id === id); if (!r) return;
+  const cur = `${attTimeHM(r.clock_in)}-${r.clock_out ? attTimeHM(r.clock_out) : ""}`;
+  const v = prompt(aT(`${r.date} 출근-퇴근 시각 (필리핀 시간, 예: 09:00-18:00)`,`${r.date} in-out time (PH time, e.g. 09:00-18:00)`), cur);
+  if (v === null) return;
+  const mm = v.trim().match(/^([01]?\d|2[0-3]):([0-5]\d)\s*-\s*(?:([01]?\d|2[0-3]):([0-5]\d))?$/);
+  if (!mm) { toast(aT("09:00-18:00 형식으로 입력하세요","Use 09:00-18:00")); return; }
+  const inTs = new Date(`${r.date}T${mm[1].padStart(2,"0")}:${mm[2]}:00+08:00`);
+  let outTs = mm[3] ? new Date(`${r.date}T${mm[3].padStart(2,"0")}:${mm[4]}:00+08:00`) : null;
+  if (outTs && outTs < inTs) outTs = new Date(outTs.getTime() + 864e5);
+  const { error } = await sb.from("attendance").update({ clock_in:inTs.toISOString(), clock_out:outTs ? outTs.toISOString() : null, admin_edit:true }).eq("id", id);
+  if (error) { toast(aT("저장 실패: ","Save failed: ") + error.message); return; }
+  toast(aT("저장되었습니다","Saved")); screenAttend();
+}
+async function attAddShift(){
+  const emp = Number($("asEmp").value), d = $("asDate").value, a = $("asIn").value, b = $("asOut").value;
+  if (!emp || !d || !a) { toast(aT("직원·날짜·출근 시각을 입력하세요","Choose staff, date and time in")); return; }
+  const inTs = new Date(`${d}T${a}:00+08:00`); let outTs = b ? new Date(`${d}T${b}:00+08:00`) : null;
+  if (outTs && outTs < inTs) outTs = new Date(outTs.getTime() + 864e5);
+  const { error } = await sb.from("attendance").insert({ branch_id:String(attState.branch), employee_id:emp, date:d, clock_in:inTs.toISOString(), clock_out:outTs ? outTs.toISOString() : null, admin_edit:true });
+  if (error) { toast(aT("저장 실패: ","Save failed: ") + error.message); return; }
+  toast(aT("저장되었습니다","Saved")); screenAttend();
+}
+async function attSetRadius(bId, v){
+  const n = Math.max(10, Number(v) || 100);
+  const { error } = await sb.from("branches").update({ geofence_m:n }).eq("id", String(bId));
+  toast(error ? aT("저장 실패: ","Save failed: ") + error.message : aT("저장되었습니다","Saved"));
+}
+async function attSetAddress(bId, v){
+  const { error } = await sb.from("branches").update({ address:v }).eq("id", String(bId));
+  toast(error ? aT("저장 실패: ","Save failed: ") + error.message : aT("저장되었습니다","Saved"));
+}
+async function attClearLoc(bId){
+  if (!confirm(aT("이 지점 좌표를 초기화할까요? (지점에서 다시 등록해야 합니다)","Reset this branch's coordinates? The branch must register again."))) return;
+  const { error } = await sb.from("branches").update({ lat:null, lng:null }).eq("id", String(bId));
+  if (error) { toast(aT("저장 실패: ","Save failed: ") + error.message); return; }
+  toast(aT("초기화되었습니다","Reset")); screenAttend();
+}
+async function attSetRetention(v){
+  const n = Math.min(730, Math.max(30, Number(v) || 90));
+  const { error } = await sb.from("app_settings").upsert({ key:"att_photo_retention_days", value:String(n) });
+  toast(error ? aT("저장 실패: ","Save failed: ") + error.message : aT("저장되었습니다","Saved"));
+}
+async function attPurgePhotos(manual){
+  const keep = Number(state._attRetention || 90);
+  const cutoff = new Date(Date.now() - keep*864e5).toLocaleDateString("en-CA", { timeZone: ATT_TZ });
+  const { data, error } = await sb.from("attendance").select("id,photo_path").not("photo_path","is",null).lt("date", cutoff).limit(500);
+  if (error) { if (manual) toast(error.message); return; }
+  if (!data?.length) { if (manual) toast(aT("정리할 사진이 없습니다","No photos to clean")); return; }
+  const up = await sb.from("attendance").update({ photo_path:null }).in("id", data.map((r) => r.id)).select("id,photo_path");
+  if (up.error) { if (manual) toast(up.error.message); return; }
+  const ok = new Set((up.data||[]).filter((r) => !r.photo_path).map((r) => r.id));
+  const paths = data.filter((r) => ok.has(r.id)).map((r) => r.photo_path);
+  if (paths.length) await sb.storage.from(ATT_BUCKET).remove(paths);
+  if (manual) { toast(`${aT("사진 정리 완료","Cleaned")}: ${paths.length}`); screenAttend(); }
 }
 
 init();
