@@ -17,7 +17,7 @@ alter table kfr.branches
 -- 2) 지점별 직원 (지점마다 명단·PIN·일급·근무시간 따로)
 create table if not exists kfr.employees(
   id bigint generated always as identity primary key,
-  branch_id text not null references kfr.branches(id),
+  branch_id integer not null references kfr.branches(id),   -- branches.id 가 integer 이므로 integer
   name text not null, name_en text,
   pin text not null,                                         -- 출퇴근 때 본인 확인용 개인 PIN
   role text not null default 'STAFF',                        -- STAFF / MANAGER (표시용)
@@ -34,7 +34,7 @@ create index if not exists employees_branch_idx on kfr.employees(branch_id);
 -- 3) 출퇴근 기록
 create table if not exists kfr.attendance(
   id bigint generated always as identity primary key,
-  branch_id text not null references kfr.branches(id),
+  branch_id integer not null references kfr.branches(id),
   employee_id bigint not null references kfr.employees(id),
   date date not null,
   clock_in timestamptz, clock_out timestamptz,
@@ -63,7 +63,7 @@ $$;
 create or replace function kfr.attendance_guard() returns trigger
 language plpgsql as $$
 declare
-  slat float8; slng float8; fence integer; keep integer; emp_branch text;
+  slat float8; slng float8; fence integer; keep integer; emp_branch integer;
 begin
   select lat, lng, geofence_m into slat, slng, fence from kfr.branches where id = coalesce(new.branch_id, old.branch_id);
   fence := coalesce(fence, 100);

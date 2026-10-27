@@ -1849,7 +1849,7 @@ function empMgmtHTML(branchId, emps){
 async function attAddEmp(branchId){
   const name = $("empName").value.trim(), name_en = $("empNameEn").value.trim(), pin = $("empPin").value.trim();
   if (!name || !pin) { toast(aT("이름과 PIN을 입력하세요","Enter name and PIN")); return; }
-  const { error } = await sb.from("employees").insert({ branch_id:String(branchId), name, name_en:name_en||null, pin, role:"STAFF" });
+  const { error } = await sb.from("employees").insert({ branch_id:Number(branchId), name, name_en:name_en||null, pin, role:"STAFF" });
   if (error) { toast(aT("저장 실패: ","Save failed: ") + error.message); return; }
   toast(aT("직원이 추가되었습니다","Staff added")); renderScreen();
 }
@@ -1997,7 +1997,7 @@ async function clkConfirm(){
     if (!clk.pos && !confirm(aT("위치 없이 출근할까요? (⚠️로 표시됩니다)","Clock in without location? (marked ⚠️)"))) { restore(); return; }
     const cur = await clkOpenShift(clk.emp.id);
     if (cur && !cur.stale) { toast(aT("이미 출근 중입니다","Already clocked in")); return screenClock(); }
-    const bId = String(state.user.branchId), d = attToday();
+    const bId = Number(state.user.branchId), d = attToday();
     const path = `${bId}/${d}/${clk.emp.id}_${Date.now()}.jpg`;
     const up = await sb.storage.from(ATT_BUCKET).upload(path, clk.blob, { contentType:"image/jpeg", upsert:false });
     if (up.error) throw up.error;
@@ -2155,7 +2155,7 @@ async function attAddShift(){
   if (!emp || !d || !a) { toast(aT("직원·날짜·출근 시각을 입력하세요","Choose staff, date and time in")); return; }
   const inTs = new Date(`${d}T${a}:00+08:00`); let outTs = b ? new Date(`${d}T${b}:00+08:00`) : null;
   if (outTs && outTs < inTs) outTs = new Date(outTs.getTime() + 864e5);
-  const { error } = await sb.from("attendance").insert({ branch_id:String(attState.branch), employee_id:emp, date:d, clock_in:inTs.toISOString(), clock_out:outTs ? outTs.toISOString() : null, admin_edit:true });
+  const { error } = await sb.from("attendance").insert({ branch_id:Number(attState.branch), employee_id:emp, date:d, clock_in:inTs.toISOString(), clock_out:outTs ? outTs.toISOString() : null, admin_edit:true });
   if (error) { toast(aT("저장 실패: ","Save failed: ") + error.message); return; }
   toast(aT("저장되었습니다","Saved")); screenAttend();
 }
